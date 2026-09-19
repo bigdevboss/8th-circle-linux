@@ -1,0 +1,254 @@
+start:
+    seta after_arg
+    storea arg_ret
+    jump copy_arg1
+after_arg:
+    branchz use_dot
+    seta path_buf
+    storea ls_path_ptr
+    jump ls_run
+use_dot:
+    seta dot_path
+    storea ls_path_ptr
+ls_run:
+    loada ls_path_ptr
+    trap open A 0 0
+    brancherr failed
+    storea ls_fd
+read_loop:
+    loada ls_fd
+    trap getdents64 A dir_buf 4096
+    brancherr read_failed
+    branchz close_ok
+    storea dir_len
+    seta dir_buf
+    storea dir_ptr
+    seta 0
+    storea dir_pos
+entry_loop:
+    loada dir_pos
+    cmpm dir_len
+    branchz read_loop
+    loada dir_ptr
+    addi 19
+    storea dir_name_ptr
+    seta after_skip_check
+    storea dir_skip_ret
+    jump dir_is_dot_entry
+after_skip_check:
+    branchnz next_entry
+    seta after_name_copy
+    storea dir_name_ret
+    jump dir_copy_name
+after_name_copy:
+    branchz next_entry
+    trap write 1 dir_name_buf A
+    trap write 1 newline newline_end-newline
+next_entry:
+    loada dir_ptr
+    addi 16
+    storea u16_ptr
+    seta after_reclen
+    storea u16_ret
+    jump read_u16
+after_reclen:
+    branchz read_failed
+    storea dir_reclen
+    loada dir_pos
+    addm dir_reclen
+    storea dir_pos
+    loada dir_ptr
+    addm dir_reclen
+    storea dir_ptr
+    jump entry_loop
+close_ok:
+    loada ls_fd
+    trap close A
+    trap exit 0
+read_failed:
+    loada ls_fd
+    trap close A
+failed:
+    trap write 2 failed_msg failed_msg_end-failed_msg
+    trap exit 1
+
+copy_arg1:
+    loada M8_ARGC
+    cmpm one
+    branchz arg_missing
+    loada M8_ARGV
+    addi 1
+    storea scratch_ptr
+    loadi scratch_ptr
+    branchz arg_missing
+    storea src_ptr
+    seta path_buf
+    storea dst_ptr
+    seta 0
+    storea idx
+copy_loop:
+    loada idx
+    cmpm path_limit
+    branchz copy_done
+    loadi src_ptr
+    branchz copy_done
+    storei dst_ptr
+    loada src_ptr
+    addi 1
+    storea src_ptr
+    loada dst_ptr
+    addi 1
+    storea dst_ptr
+    loada idx
+    addi 1
+    storea idx
+    jump copy_loop
+copy_done:
+    seta 0
+    storei dst_ptr
+    loada idx
+    jumpm arg_ret
+arg_missing:
+    seta 0
+    jumpm arg_ret
+
+dir_is_dot_entry:
+    loada dir_name_ptr
+    storea scratch_ptr
+    loadi scratch_ptr
+    cmpm dot_char
+    branchz dir_maybe_dot
+    seta 0
+    jumpm dir_skip_ret
+dir_maybe_dot:
+    loada dir_name_ptr
+    addi 1
+    storea scratch_ptr
+    loadi scratch_ptr
+    branchz dir_skip_yes
+    cmpm dot_char
+    branchz dir_maybe_dotdot
+    seta 0
+    jumpm dir_skip_ret
+dir_maybe_dotdot:
+    loada dir_name_ptr
+    addi 2
+    storea scratch_ptr
+    loadi scratch_ptr
+    branchz dir_skip_yes
+    seta 0
+    jumpm dir_skip_ret
+dir_skip_yes:
+    seta 1
+    jumpm dir_skip_ret
+
+dir_copy_name:
+    loada dir_name_ptr
+    storea src_ptr
+    seta dir_name_buf
+    storea dst_ptr
+    seta 0
+    storea idx
+dir_copy_name_loop:
+    loada idx
+    cmpm dir_name_limit
+    branchz dir_copy_name_done
+    loadi src_ptr
+    branchz dir_copy_name_done
+    storei dst_ptr
+    loada src_ptr
+    addi 1
+    storea src_ptr
+    loada dst_ptr
+    addi 1
+    storea dst_ptr
+    loada idx
+    addi 1
+    storea idx
+    jump dir_copy_name_loop
+dir_copy_name_done:
+    seta 0
+    storei dst_ptr
+    loada idx
+    jumpm dir_name_ret
+
+read_u16:
+    loadi u16_ptr
+    storea u16_value
+    loada u16_ptr
+    addi 1
+    storea scratch_ptr
+    loadi scratch_ptr
+    storea u16_high
+read_u16_loop:
+    loada u16_high
+    branchz read_u16_done
+    loada u16_value
+    addi 256
+    storea u16_value
+    loada u16_high
+    subi 1
+    storea u16_high
+    jump read_u16_loop
+read_u16_done:
+    loada u16_value
+    jumpm u16_ret
+
+newline:
+    ascii "\n"
+newline_end:
+failed_msg:
+    ascii "ls: failed\n"
+failed_msg_end:
+dot_path:
+    cstring "."
+one:
+    word 1
+dot_char:
+    word 46
+path_limit:
+    word 511
+dir_name_limit:
+    word 255
+arg_ret:
+    word 0
+ls_fd:
+    word 0
+ls_path_ptr:
+    word 0
+dir_len:
+    word 0
+dir_pos:
+    word 0
+dir_ptr:
+    word 0
+dir_reclen:
+    word 0
+dir_name_ptr:
+    word 0
+dir_skip_ret:
+    word 0
+dir_name_ret:
+    word 0
+u16_ptr:
+    word 0
+u16_ret:
+    word 0
+u16_value:
+    word 0
+u16_high:
+    word 0
+src_ptr:
+    word 0
+dst_ptr:
+    word 0
+idx:
+    word 0
+scratch_ptr:
+    word 0
+path_buf:
+    zero 512
+dir_buf:
+    zero 4096
+dir_name_buf:
+    zero 256

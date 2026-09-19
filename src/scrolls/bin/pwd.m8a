@@ -1,0 +1,18 @@
+start:
+    trap getcwd cwd_buf 512
+    brancherr failed
+    trap write 1 cwd_buf A
+    trap write 1 newline newline_end-newline
+    trap exit 0
+failed:
+    trap write 2 failed_msg failed_msg_end-failed_msg
+    trap exit 1
+
+newline:
+    ascii "\n"
+newline_end:
+failed_msg:
+    ascii "pwd: getcwd failed\n"
+failed_msg_end:
+cwd_buf:
+    zero 512

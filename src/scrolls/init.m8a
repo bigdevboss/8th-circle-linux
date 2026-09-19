@@ -1,0 +1,174 @@
+start:
+
+    trap close 0
+    trap close 1
+    trap close 2
+    trap open console_path 2 0
+    trap open console_path 2 0
+    trap open console_path 2 0
+
+    trap setsid
+    trap chdir root_path
+
+    trap write 1 boot_msg boot_msg_end-boot_msg
+
+    trap open issue_path 0 0
+    brancherr issue_skip
+    trap read A issue_buf 512
+    brancherr issue_close
+    branchz issue_close
+    trap write 1 issue_buf A
+issue_close:
+    trap close 3
+issue_skip:
+
+    trap write 1 proc_msg proc_msg_end-proc_msg
+    trap mkdir proc_target 0o555
+    trap mount proc_src proc_target proc_type 0 0
+    brancherr proc_failed
+    trap write 1 ok_msg ok_msg_end-ok_msg
+    jump proc_done
+proc_failed:
+    trap write 1 proc_fail_msg proc_fail_msg_end-proc_fail_msg
+proc_done:
+
+    trap write 1 sys_msg sys_msg_end-sys_msg
+    trap mkdir sys_target 0o555
+    trap mount sys_src sys_target sys_type 0 0
+    brancherr sys_failed
+    trap write 1 ok_msg ok_msg_end-ok_msg
+    jump sys_done
+sys_failed:
+    trap write 1 sys_fail_msg sys_fail_msg_end-sys_fail_msg
+sys_done:
+
+    trap write 1 dev_msg dev_msg_end-dev_msg
+    trap mkdir dev_target 0o755
+    trap mount dev_src dev_target dev_type 0 0
+    brancherr dev_failed
+    trap write 1 ok_msg ok_msg_end-ok_msg
+    jump dev_done
+dev_failed:
+    trap write 1 dev_fail_msg dev_fail_msg_end-dev_fail_msg
+dev_done:
+
+supervise_msh:
+    trap write 1 spawn_msg spawn_msg_end-spawn_msg
+    trap fork
+    brancherr fork_failed
+    branchz child_exec
+
+parent_wait:
+    trap write 1 wait_msg wait_msg_end-wait_msg
+    trap wait4 -1 msh_status 0 0
+    brancherr wait_failed
+    trap write 1 reaped_msg reaped_msg_end-reaped_msg
+    trap nanosleep 1 0
+    jump supervise_msh
+
+child_exec:
+    trap execve m8_path msh_argv empty_env
+    trap write 1 exec_failed_msg exec_failed_msg_end-exec_failed_msg
+    trap exit 127
+
+fork_failed:
+    trap write 1 fork_failed_msg fork_failed_msg_end-fork_failed_msg
+    trap nanosleep 1 0
+    jump supervise_msh
+
+wait_failed:
+    trap write 1 wait_failed_msg wait_failed_msg_end-wait_failed_msg
+    trap nanosleep 1 0
+    jump supervise_msh
+
+boot_msg:
+    ascii "[8CL:init] entering the eighth circle...\n"
+    ascii "[8CL:init] console claimed; session raised; root selected.\n"
+    ascii "[8CL:init] kernel is ring 0; userland is ring 8.\n"
+boot_msg_end:
+
+proc_msg:
+    ascii "[8CL:init] mounting proc on /proc... "
+proc_msg_end:
+proc_fail_msg:
+    ascii "failed, continuing in cursed mode\n"
+proc_fail_msg_end:
+
+sys_msg:
+    ascii "[8CL:init] mounting sysfs on /sys... "
+sys_msg_end:
+sys_fail_msg:
+    ascii "failed, continuing in cursed mode\n"
+sys_fail_msg_end:
+
+dev_msg:
+    ascii "[8CL:init] mounting devtmpfs on /dev... "
+dev_msg_end:
+dev_fail_msg:
+    ascii "failed, keeping initramfs /dev\n"
+dev_fail_msg_end:
+
+ok_msg:
+    ascii "ok\n"
+ok_msg_end:
+
+spawn_msg:
+    ascii "[8CL:init] spawning msh through /bin/m8...\n"
+spawn_msg_end:
+wait_msg:
+    ascii "[8CL:init] supervisor waiting for msh...\n"
+wait_msg_end:
+reaped_msg:
+    ascii "[8CL:init] msh exited; respawning after one second.\n"
+reaped_msg_end:
+exec_failed_msg:
+    ascii "[8CL:init] child execve failed; exiting child.\n"
+exec_failed_msg_end:
+fork_failed_msg:
+    ascii "[8CL:init] fork failed; retrying after one second.\n"
+fork_failed_msg_end:
+wait_failed_msg:
+    ascii "[8CL:init] wait4 failed; retrying after one second.\n"
+wait_failed_msg_end:
+
+root_path:
+    cstring "/"
+console_path:
+    cstring "/dev/console"
+issue_path:
+    cstring "/etc/issue"
+
+m8_path:
+    cstring "/bin/m8"
+msh_path:
+    cstring "/bin/msh.mb"
+msh_argv:
+    ptrv m8_path msh_path
+empty_env:
+    word 0
+msh_status:
+    word 0
+
+proc_src:
+    cstring "proc"
+proc_target:
+    cstring "/proc"
+proc_type:
+    cstring "proc"
+
+sys_src:
+    cstring "sysfs"
+sys_target:
+    cstring "/sys"
+sys_type:
+    cstring "sysfs"
+
+dev_src:
+    cstring "devtmpfs"
+dev_target:
+    cstring "/dev"
+dev_type:
+    cstring "devtmpfs"
+
+issue_buf:
+    zero 512

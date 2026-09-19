@@ -1,0 +1,559 @@
+start:
+    trap write 1 banner banner_end-banner
+
+msh_loop:
+    trap write 1 prompt prompt_end-prompt
+    seta after_read_line
+    storea read_ret
+    jump read_line
+after_read_line:
+    loada read_status
+    branchnz read_failed
+    loada line_len
+    branchz eof
+
+    seta after_trim
+    storea trim_ret
+    jump trim_line
+after_trim:
+    loada line_len
+    branchz msh_loop
+
+    seta after_parse
+    storea parse_ret
+    jump parse_line
+after_parse:
+    loada cmd_len
+    branchz msh_loop
+
+    seta help_cmd
+    storea cmp_ptr
+    seta help_cmd_end-help_cmd
+    storea cmp_len
+    seta after_help_cmp
+    storea cmp_ret
+    jump cmd_eq
+after_help_cmp:
+    branchnz do_help
+
+    seta exit_cmd
+    storea cmp_ptr
+    seta exit_cmd_end-exit_cmd
+    storea cmp_len
+    seta after_exit_cmp
+    storea cmp_ret
+    jump cmd_eq
+after_exit_cmp:
+    branchnz do_exit
+
+    seta cd_cmd
+    storea cmp_ptr
+    seta cd_cmd_end-cd_cmd
+    storea cmp_len
+    seta after_cd_cmp
+    storea cmp_ret
+    jump cmd_eq
+after_cd_cmp:
+    branchnz do_cd
+
+    seta mfsls_cmd
+    storea cmp_ptr
+    seta mfsls_cmd_end-mfsls_cmd
+    storea cmp_len
+    seta after_mfsls_cmp
+    storea cmp_ret
+    jump cmd_eq
+after_mfsls_cmp:
+    branchnz run_mfsls_alias
+
+    seta mfscat_cmd
+    storea cmp_ptr
+    seta mfscat_cmd_end-mfscat_cmd
+    storea cmp_len
+    seta after_mfscat_cmp
+    storea cmp_ret
+    jump cmd_eq
+after_mfscat_cmp:
+    branchnz run_mfscat_alias
+
+    seta after_build_path
+    storea build_path_ret
+    jump build_cmd_path
+after_build_path:
+    seta cmd_path_buf
+    storea cmd_image_ptr
+    jump run_external
+
+do_help:
+    trap write 1 help_msg help_msg_end-help_msg
+    jump msh_loop
+
+do_exit:
+    trap write 1 exit_msg exit_msg_end-exit_msg
+    trap exit 0
+
+do_cd:
+    loada arg_len
+    branchz cd_root
+    trap chdir arg_buf
+    brancherr cd_failed
+    jump msh_loop
+cd_root:
+    trap chdir root_path
+    brancherr cd_failed
+    jump msh_loop
+cd_failed:
+    trap write 1 cd_failed_msg cd_failed_msg_end-cd_failed_msg
+    jump msh_loop
+
+run_mfsls_alias:
+    seta mfs_ls_image
+    storea cmd_image_ptr
+    seta 0
+    storea arg_len
+    jump run_external
+
+run_mfscat_alias:
+    seta mfs_cat_image
+    storea cmd_image_ptr
+    jump run_external
+
+run_external:
+    loada arg_len
+    branchz run_no_arg
+    seta arg_buf
+    storea cmd_arg_ptr
+    jump run_with_argv
+run_no_arg:
+    seta 0
+    storea cmd_arg_ptr
+run_with_argv:
+    loada cmd_image_ptr
+    trap open A 0 0
+    brancherr unknown_command
+    trap close A
+    seta exec_argv+1
+    storea scratch_ptr
+    loada cmd_image_ptr
+    storei scratch_ptr
+    seta exec_argv+2
+    storea scratch_ptr
+    loada cmd_arg_ptr
+    storei scratch_ptr
+    trap fork
+    brancherr external_failed
+    branchz external_child
+    trap wait4 A child_status 0 0
+    brancherr external_failed
+    jump msh_loop
+
+external_child:
+    trap execve m8_path exec_argv empty_env
+    trap write 1 exec_failed_msg exec_failed_msg_end-exec_failed_msg
+    trap exit 127
+
+unknown_command:
+    trap write 1 unknown_prefix unknown_prefix_end-unknown_prefix
+    loada cmd_len
+    trap write 1 cmd_buf A
+    trap write 1 newline newline_end-newline
+    jump msh_loop
+
+external_failed:
+    trap write 1 external_failed_msg external_failed_msg_end-external_failed_msg
+    jump msh_loop
+
+read_failed:
+    trap write 1 read_failed_msg read_failed_msg_end-read_failed_msg
+    trap nanosleep 1 0
+    jump msh_loop
+
+eof:
+    trap write 1 eof_msg eof_msg_end-eof_msg
+    trap exit 0
+
+read_line:
+    seta 0
+    storea line_len
+    storea read_status
+read_line_loop:
+    loada line_len
+    cmpm line_max
+    branchz read_line_finish
+    trap read 0 input_byte 1
+    brancherr read_line_fail
+    branchz read_line_finish
+    seta line_buf
+    addm line_len
+    storea scratch_ptr
+    loada input_byte
+    storei scratch_ptr
+    loada line_len
+    addi 1
+    storea line_len
+    loada input_byte
+    cmpm lf_char
+    branchz read_line_finish
+    jump read_line_loop
+read_line_fail:
+    seta 1
+    storea read_status
+    jumpm read_ret
+read_line_finish:
+    seta 0
+    storea read_status
+    jumpm read_ret
+
+trim_line:
+    loada line_len
+    branchz trim_zero
+trim_loop:
+    loada line_len
+    branchz trim_zero
+    seta line_buf
+    addm line_len
+    subi 1
+    storea scratch_ptr
+    loadi scratch_ptr
+    cmpm lf_char
+    branchz trim_drop
+    loadi scratch_ptr
+    cmpm cr_char
+    branchz trim_drop
+    jump trim_finish
+trim_drop:
+    loada line_len
+    subi 1
+    storea line_len
+    jump trim_loop
+trim_finish:
+    seta line_buf
+    addm line_len
+    storea scratch_ptr
+    seta 0
+    storei scratch_ptr
+    jumpm trim_ret
+trim_zero:
+    seta line_buf
+    storea scratch_ptr
+    seta 0
+    storei scratch_ptr
+    jumpm trim_ret
+
+parse_line:
+    seta 0
+    storea cmd_len
+    storea arg_len
+    seta line_buf
+    storea src_ptr
+parse_skip_leading:
+    loadi src_ptr
+    branchz parse_done
+    cmpm space_char
+    branchz parse_skip_one
+    jump parse_cmd_loop
+parse_skip_one:
+    loada src_ptr
+    addi 1
+    storea src_ptr
+    jump parse_skip_leading
+parse_cmd_loop:
+    loadi src_ptr
+    branchz parse_cmd_done
+    cmpm space_char
+    branchz parse_cmd_done
+    loada cmd_len
+    cmpm cmd_limit
+    branchz parse_cmd_done
+    seta cmd_buf
+    addm cmd_len
+    storea dst_ptr
+    loadi src_ptr
+    storei dst_ptr
+    loada src_ptr
+    addi 1
+    storea src_ptr
+    loada cmd_len
+    addi 1
+    storea cmd_len
+    jump parse_cmd_loop
+parse_cmd_done:
+    seta cmd_buf
+    addm cmd_len
+    storea dst_ptr
+    seta 0
+    storei dst_ptr
+parse_arg_skip:
+    loadi src_ptr
+    branchz parse_arg_done
+    cmpm space_char
+    branchz parse_arg_skip_one
+    jump parse_arg_loop
+parse_arg_skip_one:
+    loada src_ptr
+    addi 1
+    storea src_ptr
+    jump parse_arg_skip
+parse_arg_loop:
+    loadi src_ptr
+    branchz parse_arg_done
+    loada arg_len
+    cmpm arg_limit
+    branchz parse_arg_done
+    seta arg_buf
+    addm arg_len
+    storea dst_ptr
+    loadi src_ptr
+    storei dst_ptr
+    loada src_ptr
+    addi 1
+    storea src_ptr
+    loada arg_len
+    addi 1
+    storea arg_len
+    jump parse_arg_loop
+parse_arg_done:
+    seta arg_buf
+    addm arg_len
+    storea dst_ptr
+    seta 0
+    storei dst_ptr
+parse_done:
+    jumpm parse_ret
+
+cmd_eq:
+    loada cmd_len
+    cmpm cmp_len
+    branchz cmd_eq_len_ok
+    seta 0
+    jumpm cmp_ret
+cmd_eq_len_ok:
+    seta cmd_buf
+    storea src_ptr
+    loada cmp_ptr
+    storea pat_ptr
+    seta 0
+    storea idx
+cmd_eq_loop:
+    loada idx
+    cmpm cmp_len
+    branchz str_success
+    loadi src_ptr
+    storea tmp_ch
+    loadi pat_ptr
+    cmpm tmp_ch
+    branchz cmd_eq_char_ok
+    seta 0
+    jumpm cmp_ret
+cmd_eq_char_ok:
+    loada src_ptr
+    addi 1
+    storea src_ptr
+    loada pat_ptr
+    addi 1
+    storea pat_ptr
+    loada idx
+    addi 1
+    storea idx
+    jump cmd_eq_loop
+
+str_success:
+    seta 1
+    jumpm cmp_ret
+
+build_cmd_path:
+    seta cmd_path_buf
+    storea copy_dst
+    seta bin_prefix
+    storea copy_src
+    seta bin_prefix_end-bin_prefix
+    storea copy_len
+    seta after_copy_bin_prefix
+    storea copy_ret
+    jump copy_bytes
+after_copy_bin_prefix:
+    seta cmd_buf
+    storea copy_src
+    loada cmd_len
+    storea copy_len
+    seta after_copy_cmd_name
+    storea copy_ret
+    jump copy_bytes
+after_copy_cmd_name:
+    seta mb_suffix
+    storea copy_src
+    seta mb_suffix_end-mb_suffix
+    storea copy_len
+    seta after_copy_mb_suffix
+    storea copy_ret
+    jump copy_bytes
+after_copy_mb_suffix:
+    seta 0
+    storei copy_dst
+    jumpm build_path_ret
+
+copy_bytes:
+    seta 0
+    storea idx
+copy_bytes_loop:
+    loada idx
+    cmpm copy_len
+    branchz copy_bytes_done
+    loadi copy_src
+    storei copy_dst
+    loada copy_src
+    addi 1
+    storea copy_src
+    loada copy_dst
+    addi 1
+    storea copy_dst
+    loada idx
+    addi 1
+    storea idx
+    jump copy_bytes_loop
+copy_bytes_done:
+    jumpm copy_ret
+
+banner:
+    ascii "Welcome to 8th circle Linux! Type 'help' to see msh commands.\n"
+banner_end:
+prompt:
+    ascii "msh> "
+prompt_end:
+help_msg:
+    ascii "8th Circle Linux msh builtins:\n"
+    ascii "  help        - show this help\n"
+    ascii "  exit        - leave msh; init will respawn it\n"
+    ascii "  cd [PATH]   - change directory, bare cd goes to /\n"
+    ascii "External M8 commands are loaded from /bin/NAME.mb.\n"
+    ascii "Aliases: mfsls -> mfs.ls, mfscat -> mfs.cat.\n"
+help_msg_end:
+exit_msg:
+    ascii "[8CL:msh] exiting; PID 1 will reopen the circle.\n"
+exit_msg_end:
+unknown_prefix:
+    ascii "[8CL:msh] unknown command: "
+unknown_prefix_end:
+cd_failed_msg:
+    ascii "[8CL:msh] cd: chdir failed\n"
+cd_failed_msg_end:
+external_failed_msg:
+    ascii "[8CL:msh] command failed\n"
+external_failed_msg_end:
+exec_failed_msg:
+    ascii "[8CL:msh] exec failed\n"
+exec_failed_msg_end:
+read_failed_msg:
+    ascii "[8CL:msh] read failed; retrying.\n"
+read_failed_msg_end:
+eof_msg:
+    ascii "[8CL:msh] stdin closed; exiting so init can respawn me.\n"
+eof_msg_end:
+newline:
+    ascii "\n"
+newline_end:
+
+help_cmd:
+    ascii "help"
+help_cmd_end:
+exit_cmd:
+    ascii "exit"
+exit_cmd_end:
+cd_cmd:
+    ascii "cd"
+cd_cmd_end:
+mfsls_cmd:
+    ascii "mfsls"
+mfsls_cmd_end:
+mfscat_cmd:
+    ascii "mfscat"
+mfscat_cmd_end:
+bin_prefix:
+    ascii "/bin/"
+bin_prefix_end:
+mb_suffix:
+    ascii ".mb"
+mb_suffix_end:
+
+root_path:
+    cstring "/"
+m8_path:
+    cstring "/bin/m8"
+mfs_ls_image:
+    cstring "/bin/mfs.ls.mb"
+mfs_cat_image:
+    cstring "/bin/mfs.cat.mb"
+empty_env:
+    word 0
+exec_argv:
+    ptrv m8_path cmd_path_buf
+lf_char:
+    word 10
+cr_char:
+    word 13
+space_char:
+    word 32
+line_max:
+    word 256
+cmd_limit:
+    word 95
+arg_limit:
+    word 511
+line_len:
+    word 0
+cmd_len:
+    word 0
+arg_len:
+    word 0
+read_ret:
+    word 0
+read_status:
+    word 0
+trim_ret:
+    word 0
+parse_ret:
+    word 0
+cmp_ret:
+    word 0
+build_path_ret:
+    word 0
+copy_ret:
+    word 0
+cmd_image_ptr:
+    word 0
+cmd_arg_ptr:
+    word 0
+child_status:
+    word 0
+cmp_ptr:
+    word 0
+cmp_len:
+    word 0
+copy_src:
+    word 0
+copy_dst:
+    word 0
+copy_len:
+    word 0
+src_ptr:
+    word 0
+pat_ptr:
+    word 0
+dst_ptr:
+    word 0
+idx:
+    word 0
+tmp_ch:
+    word 0
+scratch_ptr:
+    word 0
+input_byte:
+    word 0
+line_buf:
+    zero 257
+cmd_buf:
+    zero 96
+arg_buf:
+    zero 512
+cmd_path_buf:
+    zero 512

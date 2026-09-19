@@ -1,0 +1,102 @@
+start:
+    seta after_arg
+    storea arg_ret
+    jump copy_arg1
+after_arg:
+    branchz usage
+    trap open path_buf 0 0
+    brancherr open_failed
+    storea fd
+    jump read_loop
+read_loop:
+    loada fd
+    trap read A file_buf 512
+    brancherr read_failed
+    branchz close_ok
+    trap write 1 file_buf A
+    jump read_loop
+close_ok:
+    loada fd
+    trap close A
+    trap exit 0
+usage:
+    trap write 2 usage_msg usage_msg_end-usage_msg
+    trap exit 2
+open_failed:
+    trap write 2 open_failed_msg open_failed_msg_end-open_failed_msg
+    trap exit 1
+read_failed:
+    trap write 2 read_failed_msg read_failed_msg_end-read_failed_msg
+    loada fd
+    trap close A
+    trap exit 1
+
+copy_arg1:
+    loada M8_ARGC
+    cmpm one
+    branchz arg_missing
+    loada M8_ARGV
+    addi 1
+    storea scratch_ptr
+    loadi scratch_ptr
+    branchz arg_missing
+    storea src_ptr
+    seta path_buf
+    storea dst_ptr
+    seta 0
+    storea idx
+copy_loop:
+    loada idx
+    cmpm path_limit
+    branchz copy_done
+    loadi src_ptr
+    branchz copy_done
+    storei dst_ptr
+    loada src_ptr
+    addi 1
+    storea src_ptr
+    loada dst_ptr
+    addi 1
+    storea dst_ptr
+    loada idx
+    addi 1
+    storea idx
+    jump copy_loop
+copy_done:
+    seta 0
+    storei dst_ptr
+    loada idx
+    jumpm arg_ret
+arg_missing:
+    seta 0
+    jumpm arg_ret
+
+usage_msg:
+    ascii "usage: cat PATH\n"
+usage_msg_end:
+open_failed_msg:
+    ascii "cat: open failed\n"
+open_failed_msg_end:
+read_failed_msg:
+    ascii "cat: read failed\n"
+read_failed_msg_end:
+one:
+    word 1
+path_limit:
+    word 511
+arg_ret:
+    word 0
+fd:
+    word 0
+src_ptr:
+    word 0
+dst_ptr:
+    word 0
+idx:
+    word 0
+scratch_ptr:
+    word 0
+path_buf:
+    zero 512
+file_buf:
+    zero 512

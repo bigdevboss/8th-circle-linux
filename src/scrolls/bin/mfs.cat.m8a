@@ -1,0 +1,276 @@
+start:
+    seta after_arg
+    storea arg_ret
+    jump copy_arg1
+after_arg:
+    branchz usage
+    seta after_load
+    storea mfs_ret
+    jump mfs_load
+after_load:
+    loada mfs_status
+    branchnz failed
+    seta mfs_buf
+    addi 12
+    storea scratch_ptr
+    loadi scratch_ptr
+    storea mfs_entry_count
+    seta mfs_buf
+    addi 512
+    storea mfs_entry_ptr
+    seta 0
+    storea mfs_entry_idx
+find_loop:
+    loada mfs_entry_idx
+    cmpm mfs_entry_count
+    branchz failed
+    seta after_match
+    storea mfs_match_ret
+    jump mfs_name_matches_path
+after_match:
+    branchnz found
+    loada mfs_entry_ptr
+    addi 128
+    storea mfs_entry_ptr
+    loada mfs_entry_idx
+    addi 1
+    storea mfs_entry_idx
+    jump find_loop
+found:
+    loada mfs_entry_ptr
+    addi 96
+    storea u16_ptr
+    seta after_offset
+    storea u16_ret
+    jump read_u16
+after_offset:
+    storea mfs_file_offset
+    loada mfs_entry_ptr
+    addi 100
+    storea u16_ptr
+    seta after_size
+    storea u16_ret
+    jump read_u16
+after_size:
+    storea mfs_file_size
+    seta mfs_buf
+    addm mfs_file_offset
+    storea src_ptr
+    seta out_buf
+    storea dst_ptr
+    seta 0
+    storea idx
+copy_payload_loop:
+    loada idx
+    cmpm mfs_file_size
+    branchz copy_payload_done
+    loada idx
+    cmpm out_limit
+    branchz copy_payload_done
+    loadi src_ptr
+    storei dst_ptr
+    loada src_ptr
+    addi 1
+    storea src_ptr
+    loada dst_ptr
+    addi 1
+    storea dst_ptr
+    loada idx
+    addi 1
+    storea idx
+    jump copy_payload_loop
+copy_payload_done:
+    loada idx
+    trap write 1 out_buf A
+    trap exit 0
+usage:
+    trap write 2 usage_msg usage_msg_end-usage_msg
+    trap exit 2
+failed:
+    trap write 2 failed_msg failed_msg_end-failed_msg
+    trap exit 1
+
+copy_arg1:
+    loada M8_ARGC
+    cmpm one
+    branchz arg_missing
+    loada M8_ARGV
+    addi 1
+    storea scratch_ptr
+    loadi scratch_ptr
+    branchz arg_missing
+    storea src_ptr
+    seta path_buf
+    storea dst_ptr
+    seta 0
+    storea idx
+copy_arg_loop:
+    loada idx
+    cmpm path_limit
+    branchz copy_arg_done
+    loadi src_ptr
+    branchz copy_arg_done
+    storei dst_ptr
+    loada src_ptr
+    addi 1
+    storea src_ptr
+    loada dst_ptr
+    addi 1
+    storea dst_ptr
+    loada idx
+    addi 1
+    storea idx
+    jump copy_arg_loop
+copy_arg_done:
+    seta 0
+    storei dst_ptr
+    loada idx
+    jumpm arg_ret
+arg_missing:
+    seta 0
+    jumpm arg_ret
+
+mfs_load:
+    trap open mfs_image_path 0 0
+    brancherr mfs_load_fail
+    storea mfs_fd
+    trap read A mfs_buf 8192
+    brancherr mfs_load_close_fail
+    storea mfs_len
+    loada mfs_fd
+    trap close A
+    seta 0
+    storea mfs_status
+    loada mfs_len
+    jumpm mfs_ret
+mfs_load_close_fail:
+    loada mfs_fd
+    trap close A
+mfs_load_fail:
+    seta 1
+    storea mfs_status
+    seta 0
+    jumpm mfs_ret
+
+mfs_name_matches_path:
+    loada mfs_entry_ptr
+    storea src_ptr
+    seta path_buf
+    storea pat_ptr
+    seta 0
+    storea idx
+match_loop:
+    loada idx
+    cmpm mfs_name_limit
+    branchz match_fail
+    loadi src_ptr
+    storea tmp_ch
+    loadi pat_ptr
+    cmpm tmp_ch
+    branchz match_chars_equal
+match_fail:
+    seta 0
+    jumpm mfs_match_ret
+match_chars_equal:
+    loada tmp_ch
+    branchz match_success
+    loada src_ptr
+    addi 1
+    storea src_ptr
+    loada pat_ptr
+    addi 1
+    storea pat_ptr
+    loada idx
+    addi 1
+    storea idx
+    jump match_loop
+match_success:
+    seta 1
+    jumpm mfs_match_ret
+
+read_u16:
+    loadi u16_ptr
+    storea u16_value
+    loada u16_ptr
+    addi 1
+    storea scratch_ptr
+    loadi scratch_ptr
+    storea u16_high
+read_u16_loop:
+    loada u16_high
+    branchz read_u16_done
+    loada u16_value
+    addi 256
+    storea u16_value
+    loada u16_high
+    subi 1
+    storea u16_high
+    jump read_u16_loop
+read_u16_done:
+    loada u16_value
+    jumpm u16_ret
+
+usage_msg:
+    ascii "usage: mfscat NAME\n"
+usage_msg_end:
+failed_msg:
+    ascii "mfs.cat: failed\n"
+failed_msg_end:
+mfs_image_path:
+    cstring "/mfs/root.mfs"
+one:
+    word 1
+path_limit:
+    word 511
+mfs_name_limit:
+    word 95
+out_limit:
+    word 4096
+arg_ret:
+    word 0
+mfs_fd:
+    word 0
+mfs_len:
+    word 0
+mfs_status:
+    word 0
+mfs_ret:
+    word 0
+mfs_entry_count:
+    word 0
+mfs_entry_idx:
+    word 0
+mfs_entry_ptr:
+    word 0
+mfs_match_ret:
+    word 0
+mfs_file_offset:
+    word 0
+mfs_file_size:
+    word 0
+u16_ptr:
+    word 0
+u16_ret:
+    word 0
+u16_value:
+    word 0
+u16_high:
+    word 0
+src_ptr:
+    word 0
+pat_ptr:
+    word 0
+dst_ptr:
+    word 0
+idx:
+    word 0
+tmp_ch:
+    word 0
+scratch_ptr:
+    word 0
+path_buf:
+    zero 512
+out_buf:
+    zero 4096
+mfs_buf:
+    zero 8192

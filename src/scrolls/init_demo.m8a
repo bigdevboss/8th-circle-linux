@@ -1,0 +1,59 @@
+start:
+    trap write 1 boot_msg boot_msg_end-boot_msg
+
+    trap mkdir proc_target 0o555
+    trap write 1 proc_msg proc_msg_end-proc_msg
+    trap mount proc_src proc_target proc_type 0 0
+
+    trap mkdir sys_target 0o555
+    trap write 1 sys_msg sys_msg_end-sys_msg
+    trap mount sys_src sys_target sys_type 0 0
+
+    trap mkdir dev_target 0o755
+    trap write 1 dev_msg dev_msg_end-dev_msg
+    trap mount dev_src dev_target dev_type 0 0
+
+    trap write 1 done_msg done_msg_end-done_msg
+    trap exit 0
+
+boot_msg:
+    ascii "[8CL:init] entering the eighth circle...\n"
+    ascii "[8CL:init] kernel is ring 0; userland is ring 8.\n"
+boot_msg_end:
+
+proc_msg:
+    ascii "[8CL:init] mounting proc on /proc\n"
+proc_msg_end:
+
+sys_msg:
+    ascii "[8CL:init] mounting sysfs on /sys\n"
+sys_msg_end:
+
+dev_msg:
+    ascii "[8CL:init] mounting devtmpfs on /dev\n"
+dev_msg_end:
+
+done_msg:
+    ascii "[8CL:init] no shell yet; ritual complete.\n"
+done_msg_end:
+
+proc_src:
+    cstring "proc"
+proc_target:
+    cstring "/proc"
+proc_type:
+    cstring "proc"
+
+sys_src:
+    cstring "sysfs"
+sys_target:
+    cstring "/sys"
+sys_type:
+    cstring "sysfs"
+
+dev_src:
+    cstring "devtmpfs"
+dev_target:
+    cstring "/dev"
+dev_type:
+    cstring "devtmpfs"

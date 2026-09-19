@@ -1,0 +1,132 @@
+start:
+    seta after_load
+    storea mfs_ret
+    jump mfs_load
+after_load:
+    loada mfs_status
+    branchnz failed
+    seta mfs_buf
+    addi 12
+    storea scratch_ptr
+    loadi scratch_ptr
+    storea mfs_entry_count
+    seta mfs_buf
+    addi 512
+    storea mfs_entry_ptr
+    seta 0
+    storea mfs_entry_idx
+entry_loop:
+    loada mfs_entry_idx
+    cmpm mfs_entry_count
+    branchz done
+    seta after_name
+    storea mfs_name_ret
+    jump mfs_copy_name
+after_name:
+    branchz next_entry
+    trap write 1 mfs_name_buf A
+    trap write 1 newline newline_end-newline
+next_entry:
+    loada mfs_entry_ptr
+    addi 128
+    storea mfs_entry_ptr
+    loada mfs_entry_idx
+    addi 1
+    storea mfs_entry_idx
+    jump entry_loop
+done:
+    trap exit 0
+failed:
+    trap write 2 failed_msg failed_msg_end-failed_msg
+    trap exit 1
+
+mfs_load:
+    trap open mfs_image_path 0 0
+    brancherr mfs_load_fail
+    storea mfs_fd
+    trap read A mfs_buf 8192
+    brancherr mfs_load_close_fail
+    storea mfs_len
+    loada mfs_fd
+    trap close A
+    seta 0
+    storea mfs_status
+    loada mfs_len
+    jumpm mfs_ret
+mfs_load_close_fail:
+    loada mfs_fd
+    trap close A
+mfs_load_fail:
+    seta 1
+    storea mfs_status
+    seta 0
+    jumpm mfs_ret
+
+mfs_copy_name:
+    loada mfs_entry_ptr
+    storea src_ptr
+    seta mfs_name_buf
+    storea dst_ptr
+    seta 0
+    storea idx
+copy_name_loop:
+    loada idx
+    cmpm mfs_name_limit
+    branchz copy_name_done
+    loadi src_ptr
+    branchz copy_name_done
+    storei dst_ptr
+    loada src_ptr
+    addi 1
+    storea src_ptr
+    loada dst_ptr
+    addi 1
+    storea dst_ptr
+    loada idx
+    addi 1
+    storea idx
+    jump copy_name_loop
+copy_name_done:
+    seta 0
+    storei dst_ptr
+    loada idx
+    jumpm mfs_name_ret
+
+newline:
+    ascii "\n"
+newline_end:
+failed_msg:
+    ascii "mfs.ls: failed\n"
+failed_msg_end:
+mfs_image_path:
+    cstring "/mfs/root.mfs"
+mfs_name_limit:
+    word 95
+mfs_fd:
+    word 0
+mfs_len:
+    word 0
+mfs_status:
+    word 0
+mfs_ret:
+    word 0
+mfs_entry_count:
+    word 0
+mfs_entry_idx:
+    word 0
+mfs_entry_ptr:
+    word 0
+mfs_name_ret:
+    word 0
+src_ptr:
+    word 0
+dst_ptr:
+    word 0
+idx:
+    word 0
+scratch_ptr:
+    word 0
+mfs_name_buf:
+    zero 96
+mfs_buf:
+    zero 8192

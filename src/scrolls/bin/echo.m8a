@@ -1,0 +1,70 @@
+start:
+    seta after_arg
+    storea arg_ret
+    jump copy_arg1
+after_arg:
+    branchz no_text
+    trap write 1 arg_buf A
+no_text:
+    trap write 1 newline newline_end-newline
+    trap exit 0
+
+copy_arg1:
+    loada M8_ARGC
+    cmpm one
+    branchz arg_missing
+    loada M8_ARGV
+    addi 1
+    storea scratch_ptr
+    loadi scratch_ptr
+    branchz arg_missing
+    storea src_ptr
+    seta arg_buf
+    storea dst_ptr
+    seta 0
+    storea idx
+copy_loop:
+    loada idx
+    cmpm arg_limit
+    branchz copy_done
+    loadi src_ptr
+    branchz copy_done
+    storei dst_ptr
+    loada src_ptr
+    addi 1
+    storea src_ptr
+    loada dst_ptr
+    addi 1
+    storea dst_ptr
+    loada idx
+    addi 1
+    storea idx
+    jump copy_loop
+copy_done:
+    seta 0
+    storei dst_ptr
+    loada idx
+    jumpm arg_ret
+arg_missing:
+    seta 0
+    jumpm arg_ret
+
+newline:
+    ascii "\n"
+newline_end:
+one:
+    word 1
+arg_limit:
+    word 511
+arg_ret:
+    word 0
+src_ptr:
+    word 0
+dst_ptr:
+    word 0
+idx:
+    word 0
+scratch_ptr:
+    word 0
+arg_buf:
+    zero 512

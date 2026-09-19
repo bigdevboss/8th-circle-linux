@@ -1,0 +1,37 @@
+start:
+    trap open issue_path 0 0
+    brancherr open_failed
+    storea fd
+    jump read_loop
+read_loop:
+    loada fd
+    trap read A file_buf 512
+    brancherr read_failed
+    branchz close_ok
+    trap write 1 file_buf A
+    jump read_loop
+close_ok:
+    loada fd
+    trap close A
+    trap exit 0
+open_failed:
+    trap write 2 open_failed_msg open_failed_msg_end-open_failed_msg
+    trap exit 1
+read_failed:
+    trap write 2 read_failed_msg read_failed_msg_end-read_failed_msg
+    loada fd
+    trap close A
+    trap exit 1
+
+issue_path:
+    cstring "/etc/issue"
+open_failed_msg:
+    ascii "issue: open failed\n"
+open_failed_msg_end:
+read_failed_msg:
+    ascii "issue: read failed\n"
+read_failed_msg_end:
+fd:
+    word 0
+file_buf:
+    zero 512
