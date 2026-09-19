@@ -119,6 +119,8 @@ Welcome to 8th circle Linux! Type 'help' to see msh commands.
 - Pure-Python initramfs builder.
 - QEMU boot through `make qemu`.
 - PTY-driven QEMU smoke test through `make qemu-smoke`.
+- Strict glyph audit through `make glyph-audit`.
+- Negative loader checks through `make loader-tests`.
 - MFS v0 image built from `src/mfs/root/` and shipped as `/mfs/root.mfs`.
 
 Inside `msh`:
@@ -127,24 +129,26 @@ Inside `msh`:
 help
 exit
 issue
-echo TEXT
-cat PATH
+echo TEXT...
+cat PATH...
 pwd
 cd [PATH]
-ls [PATH]
+ls [PATH...]
 mfsls
 mfscat NAME
+mfs.info
+mfs.stat NAME
 ```
 
-`msh` now keeps only shell jobs in the shell: prompt, input, command parsing, `cd`, `help`, `exit`, `fork`, `execve`, and `wait4`. Most useful commands are separate printable M8 programs in `/bin`.
+`msh` now keeps only shell jobs in the shell: prompt, input, command parsing, `cd`, `help`, `exit`, argv-vector building, `fork`, `execve`, and `wait4`. Most useful commands are separate printable M8 programs in `/bin`.
 
 ## Shell honesty note
 
-`msh` is still small and weird, but it is now a launcher instead of a pile of builtins. The shell reads input through the normal Linux `read` syscall bridge, trims and parses commands in M8, then launches external `.mb` images with `/bin/m8`.
+`msh` is still small and weird, but it is now a launcher instead of a pile of builtins. The shell reads input through the normal Linux `read` syscall bridge, trims and parses commands in M8, splits up to eight whitespace-separated arguments, builds an `execve` argv vector in M8 memory, then launches external `.mb` images with `/bin/m8`.
 
 The C runtime no longer provides shell-specific helper traps. It handles the VM, primitive M8 ops, process argv setup, and the Linux syscall bridge.
 
-The shell now has a tiny PATH-like rule: a command named `NAME` launches `/bin/NAME.mb`. These command images are currently shipped:
+The shell now has a tiny PATH-like rule: a command named `NAME` launches `/bin/NAME.mb` with the parsed arguments. These command images are currently shipped:
 
 ```text
 /bin/pwd.mb
@@ -154,15 +158,24 @@ The shell now has a tiny PATH-like rule: a command named `NAME` launches `/bin/N
 /bin/ls.mb
 /bin/mfs.ls.mb
 /bin/mfs.cat.mb
+/bin/mfs.info.mb
+/bin/mfs.stat.mb
 ```
 
-`ls.mb` calls `getdents64` and parses `linux_dirent64` records in M8. `mfs.ls.mb` and `mfs.cat.mb` read `/mfs/root.mfs`, walk the MFS v0 entry table, and copy payload bytes in M8.
+`echo.mb`, `cat.mb`, and `ls.mb` now loop over argv instead of only seeing one tail string. `ls.mb` calls `getdents64` and parses `linux_dirent64` records in M8. MFS commands read `/mfs/root.mfs`, walk the MFS v0 header/table, print metadata, and copy payload bytes in M8.
 
 Friendly aliases remain:
 
 ```text
 mfsls        -> /bin/m8 /bin/mfs.ls.mb
 mfscat NAME  -> /bin/m8 /bin/mfs.cat.mb NAME
+```
+
+The dotted command names work through the generic rule too:
+
+```text
+mfs.info       -> /bin/m8 /bin/mfs.info.mb
+mfs.stat NAME  -> /bin/m8 /bin/mfs.stat.mb NAME
 ```
 
 ## M8 in one paragraph
@@ -178,6 +191,7 @@ The runtime loads them like cursed source:
 - Whitespace is skipped.
 - Every loaded cell must be printable ASCII, `33..126`.
 - Every loaded cell must decode at its address to a known M8 operation.
+- Old decimal memory images are rejected, even if they have the old header.
 - Remaining memory is filled with the Malbolge-style crazy operation.
 - Executed instruction cells self-cipher through `xlat2`.
 
@@ -185,7 +199,7 @@ M8 inline frame words use five printable base-94 cells. The assembler chooses fr
 
 Data still has to exist. Strings, pointer vectors, and numeric words are created by generated startup materializer code before the real program starts. Large buffers are reserved as printable filler and then overwritten by syscalls or M8 copy code.
 
-One ugly runtime bridge remains on purpose: extension ops track encrypted generations so loops can re-enter mutated trap and branch cells. That keeps the visible memory behavior close to Malbolge while still letting PID 1 and `msh` survive more than one prompt.
+One ugly runtime bridge remains on purpose: extension instruction cells keep their original M8 meaning across encrypted generations, so loops can re-enter mutated trap and branch cells. C4 tightened that bridge: the runtime now marks extension lineage by structurally walking the loaded source and skipping inline frames, instead of blindly treating every extension-looking frame or filler glyph as executable lineage.
 
 ## Userland image convention
 
@@ -198,11 +212,14 @@ src/scrolls/bin/*.m8a     -> src/userland/*.mb
 src/mfs/root/             -> src/userland/root.mfs
 ```
 
-Regenerate them with:
+Regenerate and audit them with:
 
 ```sh
 make raw
+make glyph-audit
 ```
+
+`make check` runs the audit and the negative loader tests, so accidental numeric `.mb` files should fail before QEMU ever boots.
 
 ## MFS v0 seed
 
@@ -235,6 +252,17 @@ Inside QEMU:
 ```text
 msh> mfsls
 etc/issue
+msh> mfs.info
+MFS8 v0 image
+entries: 1
+image-size: 1099
+entry-size: 128
+files:
+etc/issue
+msh> mfs.stat etc/issue
+name: etc/issue
+size: 75
+offset: 1024
 msh> mfscat etc/issue
 8th Circle Linux MFS image
 The filesystem is not sane, and neither are we.
@@ -258,13 +286,15 @@ Important files:
 
 - `src/runtime/m8.c` - prototype runtime for M8.
 - `src/toolchain/m8asm.py` - assembler that emits printable M8 glyph programs.
+- `src/toolchain/m8audit.py` - strict `.mb` glyph/source audit.
+- `src/toolchain/m8_loader_tests.py` - negative tests for bad `.mb` files.
 - `src/toolchain/mkmfs.py` - MFS v0 image builder.
 - `src/toolchain/mkinitramfs.py` - pure-Python `newc` initramfs packer.
 - `src/toolchain/mkdistro.py` - copies a kernel and initramfs into a local boot bundle.
 - `src/toolchain/qemu_smoke.py` - serial-console QEMU smoke test.
 - `src/userland/init.mb` - printable M8 init program shipped as `/sbin/init.mb`.
 - `src/userland/msh.mb` - printable M8 shell program shipped as `/bin/msh.mb`.
-- `src/userland/{pwd,issue,echo,cat,ls,mfs.ls,mfs.cat}.mb` - external command images shipped under `/bin`.
+- `src/userland/{pwd,issue,echo,cat,ls,mfs.ls,mfs.cat,mfs.info,mfs.stat}.mb` - external command images shipped under `/bin`.
 - `src/userland/root.mfs` - MFS v0 image shipped as `/mfs/root.mfs`.
 - `docs/m8-spec.md` - current M8 dialect and trap ABI notes.
 
@@ -272,6 +302,8 @@ Important files:
 
 ```sh
 make raw          # rebuild printable .mb programs and root.mfs
+make glyph-audit  # verify .mb files are printable valid-source glyph streams
+make loader-tests # verify bad .mb formats are rejected by the runtime
 make mfs          # rebuild only root.mfs
 make msh-demo     # run msh on the host through the runtime
 make init-demo    # run a small host-side init demo
@@ -290,18 +322,19 @@ Current checkpoint:
 - The project builds from source with `make check`.
 - The initramfs boots in QEMU.
 - PID 1 does not exit.
-- `msh` is usable enough for basic navigation and file reads.
+- `msh` is usable enough for basic navigation, file reads, and multi-argument external commands.
 - MFS v0 exists and is visible from `msh`.
-- The QEMU smoke test passes. It validates `pwd`, `ls /`, `issue`, `cat`, `echo`, `mfsls`, and `mfscat`.
+- The QEMU smoke test passes. It validates `pwd`, multi-path `ls`, multi-file `cat`, multi-word `echo`, `issue`, `mfsls`, `mfs.info`, `mfs.stat`, and `mfscat`.
 
 Still cursed and unfinished:
 
 - The kernel is not built by this repo yet.
 - There is no ISO, installer, package manager, or real disk image.
-- MFS v0 is read-only, but `mfs.ls.mb` and `mfs.cat.mb` are now standalone command images.
+- MFS v0 is read-only, but `mfs.ls.mb`, `mfs.cat.mb`, `mfs.info.mb`, and `mfs.stat.mb` are now standalone command images.
 - The shell no longer uses shell-specific C helper traps; it relies on the normal syscall bridge and primitive M8 ops.
 - `.mb` userland is printable, source-validated M8 glyph source now, not numeric VM dumps.
-- Command lookup is PATH-lite: `NAME` maps to `/bin/NAME.mb`, with special aliases for `mfsls` and `mfscat`.
+- The runtime no longer accepts old decimal `.mb` memory images in normal mode.
+- Command lookup is PATH-lite: `NAME` maps to `/bin/NAME.mb`, with up to eight parsed arguments and special aliases for `mfsls` and `mfscat`.
 
 ## License
 

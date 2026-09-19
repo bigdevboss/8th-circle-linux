@@ -78,7 +78,22 @@ def main() -> int:
     )
     os.close(slave_fd)
 
-    commands = ["help", "pwd", "ls /", "issue", "cat /etc/issue", "echo from the eighth circle", "mfsls", "mfscat etc/issue", "exit"]
+    commands = [
+        "help",
+        "pwd",
+        "ls /",
+        "ls /bin /mfs",
+        "issue",
+        "cat /etc/issue",
+        "cat /etc/issue /etc/issue",
+        "echo from the eighth circle",
+        "echo one two three",
+        "mfsls",
+        "mfs.info",
+        "mfs.stat etc/issue",
+        "mfscat etc/issue",
+        "exit",
+    ]
     sent = 0
     output_parts: list[str] = []
     raw = bytearray()
@@ -95,8 +110,19 @@ def main() -> int:
         "bin",
         "POSIX was not painful enough",
         "from the eighth circle",
+        "one two three",
+        "mfs.info.mb",
+        "mfs.stat.mb",
+        "root.mfs",
         "etc/issue",
         "8th Circle Linux MFS image",
+        "MFS8 v0 image",
+        "entries: 1",
+        "image-size: 1099",
+        "entry-size: 128",
+        "name: etc/issue",
+        "size: 75",
+        "offset: 1024",
         "[8CL:msh] exiting; PID 1 will reopen the circle.",
     ]
 

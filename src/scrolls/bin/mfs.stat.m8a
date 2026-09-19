@@ -1,0 +1,438 @@
+start:
+    seta after_arg
+    storea arg_ret
+    jump copy_arg1
+after_arg:
+    branchz usage
+    storea path_len
+    seta after_load
+    storea mfs_ret
+    jump mfs_load
+after_load:
+    loada mfs_status
+    branchnz failed
+    seta mfs_buf
+    addi 12
+    storea scratch_ptr
+    loadi scratch_ptr
+    storea mfs_entry_count
+    seta mfs_buf
+    addi 512
+    storea mfs_entry_ptr
+    seta 0
+    storea mfs_entry_idx
+find_loop:
+    loada mfs_entry_idx
+    cmpm mfs_entry_count
+    branchz not_found
+    seta after_match
+    storea mfs_match_ret
+    jump mfs_name_matches_path
+after_match:
+    branchnz found
+    loada mfs_entry_ptr
+    addi 128
+    storea mfs_entry_ptr
+    loada mfs_entry_idx
+    addi 1
+    storea mfs_entry_idx
+    jump find_loop
+found:
+    loada mfs_entry_ptr
+    addi 96
+    storea u16_ptr
+    seta after_offset
+    storea u16_ret
+    jump read_u16
+after_offset:
+    storea mfs_file_offset
+    loada mfs_entry_ptr
+    addi 100
+    storea u16_ptr
+    seta after_size
+    storea u16_ret
+    jump read_u16
+after_size:
+    storea mfs_file_size
+    trap write 1 name_label name_label_end-name_label
+    loada path_len
+    trap write 1 path_buf A
+    trap write 1 newline newline_end-newline
+    trap write 1 size_label size_label_end-size_label
+    seta after_print_size
+    storea print_ret
+    loada mfs_file_size
+    jump print_dec
+after_print_size:
+    trap write 1 newline newline_end-newline
+    trap write 1 offset_label offset_label_end-offset_label
+    seta after_print_offset
+    storea print_ret
+    loada mfs_file_offset
+    jump print_dec
+after_print_offset:
+    trap write 1 newline newline_end-newline
+    trap exit 0
+usage:
+    trap write 2 usage_msg usage_msg_end-usage_msg
+    trap exit 2
+not_found:
+    trap write 2 not_found_msg not_found_msg_end-not_found_msg
+    trap exit 1
+failed:
+    trap write 2 failed_msg failed_msg_end-failed_msg
+    trap exit 1
+
+copy_arg1:
+    loada M8_ARGC
+    cmpm one
+    branchz arg_missing
+    loada M8_ARGV
+    addi 1
+    storea scratch_ptr
+    loadi scratch_ptr
+    branchz arg_missing
+    storea src_ptr
+    seta path_buf
+    storea dst_ptr
+    seta 0
+    storea idx
+copy_arg_loop:
+    loada idx
+    cmpm path_limit
+    branchz copy_arg_done
+    loadi src_ptr
+    branchz copy_arg_done
+    storei dst_ptr
+    loada src_ptr
+    addi 1
+    storea src_ptr
+    loada dst_ptr
+    addi 1
+    storea dst_ptr
+    loada idx
+    addi 1
+    storea idx
+    jump copy_arg_loop
+copy_arg_done:
+    seta 0
+    storei dst_ptr
+    loada idx
+    jumpm arg_ret
+arg_missing:
+    seta 0
+    jumpm arg_ret
+
+mfs_load:
+    trap open mfs_image_path 0 0
+    brancherr mfs_load_fail
+    storea mfs_fd
+    trap read A mfs_buf 8192
+    brancherr mfs_load_close_fail
+    storea mfs_len
+    loada mfs_fd
+    trap close A
+    seta 0
+    storea mfs_status
+    loada mfs_len
+    jumpm mfs_ret
+mfs_load_close_fail:
+    loada mfs_fd
+    trap close A
+mfs_load_fail:
+    seta 1
+    storea mfs_status
+    seta 0
+    jumpm mfs_ret
+
+mfs_name_matches_path:
+    loada mfs_entry_ptr
+    storea src_ptr
+    seta path_buf
+    storea pat_ptr
+    seta 0
+    storea idx
+match_loop:
+    loada idx
+    cmpm mfs_name_limit
+    branchz match_fail
+    loadi src_ptr
+    storea tmp_ch
+    loadi pat_ptr
+    cmpm tmp_ch
+    branchz match_chars_equal
+match_fail:
+    seta 0
+    jumpm mfs_match_ret
+match_chars_equal:
+    loada tmp_ch
+    branchz match_success
+    loada src_ptr
+    addi 1
+    storea src_ptr
+    loada pat_ptr
+    addi 1
+    storea pat_ptr
+    loada idx
+    addi 1
+    storea idx
+    jump match_loop
+match_success:
+    seta 1
+    jumpm mfs_match_ret
+
+read_u16:
+    loadi u16_ptr
+    storea u16_value
+    loada u16_ptr
+    addi 1
+    storea scratch_ptr
+    loadi scratch_ptr
+    storea u16_high
+read_u16_loop:
+    loada u16_high
+    branchz read_u16_done
+    loada u16_value
+    addi 256
+    storea u16_value
+    loada u16_high
+    subi 1
+    storea u16_high
+    jump read_u16_loop
+read_u16_done:
+    loada u16_value
+    jumpm u16_ret
+
+print_dec:
+    storea num_value
+    seta 0
+    storea digit_ones
+    storea digit_tens
+    storea digit_hundreds
+    storea digit_thousands
+    storea digit_tenthousands
+    storea seen_digit
+    loada num_value
+    branchz print_zero
+print_dec_loop:
+    loada num_value
+    branchz print_dec_emit
+    subi 1
+    storea num_value
+    loada digit_ones
+    addi 1
+    storea digit_ones
+    cmpm ten
+    branchz carry_tens
+    jump print_dec_loop
+carry_tens:
+    seta 0
+    storea digit_ones
+    loada digit_tens
+    addi 1
+    storea digit_tens
+    cmpm ten
+    branchz carry_hundreds
+    jump print_dec_loop
+carry_hundreds:
+    seta 0
+    storea digit_tens
+    loada digit_hundreds
+    addi 1
+    storea digit_hundreds
+    cmpm ten
+    branchz carry_thousands
+    jump print_dec_loop
+carry_thousands:
+    seta 0
+    storea digit_hundreds
+    loada digit_thousands
+    addi 1
+    storea digit_thousands
+    cmpm ten
+    branchz carry_tenthousands
+    jump print_dec_loop
+carry_tenthousands:
+    seta 0
+    storea digit_thousands
+    loada digit_tenthousands
+    addi 1
+    storea digit_tenthousands
+    jump print_dec_loop
+print_zero:
+    seta 48
+    storea digit_char
+    trap write 1 digit_char 1
+    jumpm print_ret
+print_dec_emit:
+    loada digit_tenthousands
+    branchz print_10000_maybe_skip
+    seta 1
+    storea seen_digit
+    loada digit_tenthousands
+    addi 48
+    storea digit_char
+    trap write 1 digit_char 1
+    jump print_1000
+print_10000_maybe_skip:
+    loada seen_digit
+    branchz print_1000
+    loada digit_tenthousands
+    addi 48
+    storea digit_char
+    trap write 1 digit_char 1
+print_1000:
+    loada digit_thousands
+    branchz print_1000_maybe_skip
+    seta 1
+    storea seen_digit
+    loada digit_thousands
+    addi 48
+    storea digit_char
+    trap write 1 digit_char 1
+    jump print_100
+print_1000_maybe_skip:
+    loada seen_digit
+    branchz print_100
+    loada digit_thousands
+    addi 48
+    storea digit_char
+    trap write 1 digit_char 1
+print_100:
+    loada digit_hundreds
+    branchz print_100_maybe_skip
+    seta 1
+    storea seen_digit
+    loada digit_hundreds
+    addi 48
+    storea digit_char
+    trap write 1 digit_char 1
+    jump print_10
+print_100_maybe_skip:
+    loada seen_digit
+    branchz print_10
+    loada digit_hundreds
+    addi 48
+    storea digit_char
+    trap write 1 digit_char 1
+print_10:
+    loada digit_tens
+    branchz print_10_maybe_skip
+    seta 1
+    storea seen_digit
+    loada digit_tens
+    addi 48
+    storea digit_char
+    trap write 1 digit_char 1
+    jump print_1
+print_10_maybe_skip:
+    loada seen_digit
+    branchz print_1
+    loada digit_tens
+    addi 48
+    storea digit_char
+    trap write 1 digit_char 1
+print_1:
+    loada digit_ones
+    addi 48
+    storea digit_char
+    trap write 1 digit_char 1
+    jumpm print_ret
+
+name_label:
+    ascii "name: "
+name_label_end:
+size_label:
+    ascii "size: "
+size_label_end:
+offset_label:
+    ascii "offset: "
+offset_label_end:
+newline:
+    ascii "\n"
+newline_end:
+usage_msg:
+    ascii "usage: mfs.stat NAME\n"
+usage_msg_end:
+failed_msg:
+    ascii "mfs.stat: failed\n"
+failed_msg_end:
+not_found_msg:
+    ascii "mfs.stat: not found\n"
+not_found_msg_end:
+mfs_image_path:
+    cstring "/mfs/root.mfs"
+one:
+    word 1
+ten:
+    word 10
+path_limit:
+    word 511
+mfs_name_limit:
+    word 95
+arg_ret:
+    word 0
+path_len:
+    word 0
+mfs_fd:
+    word 0
+mfs_len:
+    word 0
+mfs_status:
+    word 0
+mfs_ret:
+    word 0
+mfs_entry_count:
+    word 0
+mfs_entry_idx:
+    word 0
+mfs_entry_ptr:
+    word 0
+mfs_match_ret:
+    word 0
+mfs_file_offset:
+    word 0
+mfs_file_size:
+    word 0
+u16_ptr:
+    word 0
+u16_ret:
+    word 0
+u16_value:
+    word 0
+u16_high:
+    word 0
+print_ret:
+    word 0
+num_value:
+    word 0
+seen_digit:
+    word 0
+digit_ones:
+    word 0
+digit_tens:
+    word 0
+digit_hundreds:
+    word 0
+digit_thousands:
+    word 0
+digit_tenthousands:
+    word 0
+digit_char:
+    word 0
+src_ptr:
+    word 0
+pat_ptr:
+    word 0
+dst_ptr:
+    word 0
+idx:
+    word 0
+tmp_ch:
+    word 0
+scratch_ptr:
+    word 0
+path_buf:
+    zero 512
+mfs_buf:
+    zero 8192

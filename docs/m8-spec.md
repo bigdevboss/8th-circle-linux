@@ -38,6 +38,8 @@ op is a known classic or M8 extension operation
 
 After the source stream ends, remaining memory is filled with the Malbolge-style crazy operation.
 
+Strict `.mb` mode does not accept old decimal memory images. A file starting with the old raw-image header is a loader error, not a compatibility path. `--classic SOURCE` remains only as a runtime convenience for loading plain printable Malbolge/M8 source directly.
+
 ## Instruction decoding
 
 A cell at `C` must be printable ASCII, `33..126`, to execute as code.
@@ -72,6 +74,8 @@ M8 extension ops self-cipher too:
 ```
 
 After any printable instruction cell executes, the runtime replaces that cell with `xlat2[mem[C] - 33]`. For extension cells, the runtime records the original decoded operation and the expected encrypted cell generation when the image is loaded. If a loop reaches the same extension instruction again, the current encrypted glyph still dispatches as the original M8 op, then advances to the next encrypted generation.
+
+C4 narrowed this bridge. The runtime no longer scans all memory cells and tags every extension-looking glyph. It structurally walks the loaded source from cell 0, marks extension opcode cells, and skips their inline frame cells using the same frame widths the executor uses. That means printable frame glyphs stay source-valid, but they are not treated as extension instruction lineage just because their address-dependent decode happens to look like `@` or `?`.
 
 That keeps the visible memory behavior close to Malbolge - code mutates after execution - without forcing every shell loop to rewrite its own trap and branch cells by hand.
 
@@ -227,11 +231,18 @@ The assembler exposes those addresses as symbols. Current command images use thi
 
 The current `msh.mb` path does not use shell-specific C helper traps. Input is read through the normal `read` syscall bridge in a one-byte loop and trimmed in M8 code.
 
-`msh.mb` handles prompt, command parsing, `cd`, `help`, `exit`, `fork`, `execve`, and `wait4`. For external commands it builds `/bin/NAME.mb` in VM memory, checks that it can open that image, then launches `/bin/m8 /bin/NAME.mb [ARG]`.
+`msh.mb` handles prompt, command parsing, `cd`, `help`, `exit`, argv-vector building, `fork`, `execve`, and `wait4`. For external commands it builds `/bin/NAME.mb` in VM memory, checks that it can open that image, splits up to eight whitespace-separated arguments, then launches `/bin/m8 /bin/NAME.mb [ARGS...]`.
 
 Friendly aliases map `mfsls` to `/bin/mfs.ls.mb` and `mfscat` to `/bin/mfs.cat.mb`.
 
-`ls.mb` calls the Linux `getdents64` bridge and parses `linux_dirent64` records in M8. `mfs.ls.mb` and `mfs.cat.mb` read `/mfs/root.mfs`, walk the fixed 128-byte MFS v0 entry table, and copy file payload bytes from the image buffer.
+`echo.mb`, `cat.mb`, and `ls.mb` loop over the runtime argv ABI in M8. `ls.mb` calls the Linux `getdents64` bridge and parses `linux_dirent64` records in M8. MFS commands read `/mfs/root.mfs` and parse the MFS v0 header/table in M8:
+
+- `mfs.ls.mb` lists entry names.
+- `mfs.cat.mb NAME` copies payload bytes from the image buffer.
+- `mfs.info.mb` prints entry count, image size, entry size, and file names.
+- `mfs.stat.mb NAME` prints name, size, and payload offset.
+
+The M8 readers currently consume low 16-bit little-endian fields, which is enough for the tiny 8192-byte bootstrap image buffer. Larger MFS work should grow proper multiword integer handling instead of pretending this is enough forever.
 
 ## Assembly source v0
 
@@ -283,6 +294,18 @@ src/scrolls/msh.m8a       -> src/userland/msh.mb       printable M8 glyph progra
 src/scrolls/bin/*.m8a     -> src/userland/*.mb         printable M8 glyph programs
 src/mfs/root/             -> src/userland/root.mfs     MFS v0 image
 ```
+
+
+## Format audit
+
+`src/toolchain/m8audit.py` checks the generated `.mb` files without running them. It rejects:
+
+- non-graphic source cells
+- cells that decode to unknown operations at their addresses
+- empty files
+- old decimal memory-image shapes
+
+`make glyph-audit` runs that check over `src/userland/*.mb` plus the host-side demo image. `make loader-tests` creates bad `.mb` files under `build/loader-tests/` and verifies that the runtime exits during loading.
 
 ## Philosophical rule
 

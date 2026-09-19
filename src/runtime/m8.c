@@ -116,17 +116,40 @@ static int is_m8_extension_op(char op) {
     }
 }
 
-static void prepare_extension_lineage(VM *vm, int m8_mode) {
+static int extension_frame_words(char op) {
+    switch (op) {
+        case '@':
+            return FRAME_WORDS;
+        case '?':
+            return 2;
+        case '!': case '=': case '~':
+        case '#': case '+': case '-': case '[': case ']':
+        case ':': case '^': case '$': case '`':
+            return 1;
+        default:
+            return 0;
+    }
+}
+
+static void prepare_extension_lineage(VM *vm, int loaded, int m8_mode) {
     memset(vm->ext_seed_op, 0, sizeof vm->ext_seed_op);
     memset(vm->ext_expected_cell, 0, sizeof vm->ext_expected_cell);
-    if (!m8_mode) return;
-    for (int i = 0; i < MEM_SIZE; i++) {
-        int cell = vm->mem[i];
-        if (cell < 33 || cell > 126) continue;
-        char op = decode_op_cell(cell, i);
+    if (!m8_mode || loaded <= 0) return;
+
+    int pc = 0;
+    while (pc < loaded && pc < MEM_SIZE) {
+        int cell = vm->mem[pc];
+        if (cell < 33 || cell > 126) {
+            pc++;
+            continue;
+        }
+        char op = decode_op_cell(cell, pc);
         if (is_m8_extension_op(op)) {
-            vm->ext_seed_op[i] = (unsigned char)op;
-            vm->ext_expected_cell[i] = (unsigned char)cell;
+            vm->ext_seed_op[pc] = (unsigned char)op;
+            vm->ext_expected_cell[pc] = (unsigned char)cell;
+            pc += 1 + extension_frame_words(op) * (vm->encoded_frames ? ENC_WORD_CELLS : 1);
+        } else {
+            pc++;
         }
     }
 }
@@ -180,41 +203,16 @@ static int frame_word_at(const VM *vm, int oldC, int index) {
 static void die_usage(const char *argv0) {
     fprintf(stderr,
             "usage: %s [--trace] [--max-steps N] IMAGE.mb\n"
-            "       %s --classic SOURCE.mb\n",
+            "       %s --classic SOURCE\n",
             argv0, argv0);
     exit(2);
 }
 
-static int load_numeric_image(VM *vm, const char *path, const char *text) {
-    vm->encoded_frames = 0;
-    char *copy = strdup(text ? text : "");
-    if (!copy) return -1;
-    int n = 0;
-    char *save = NULL;
-    for (char *line = strtok_r(copy, "\n", &save); line; line = strtok_r(NULL, "\n", &save)) {
-        char *p = line;
-        while (isspace((unsigned char)*p)) p++;
-        if (*p == '\0' || *p == '#') continue;
-        errno = 0;
-        char *endp = NULL;
-        long v = strtol(p, &endp, 0);
-        if (errno || endp == p) {
-            fprintf(stderr, "%s: bad word near: %s\n", path, line);
-            free(copy);
-            return -1;
-        }
-        if (n >= MEM_SIZE) {
-            fprintf(stderr, "%s: image too large for v0 memory\n", path);
-            free(copy);
-            return -1;
-        }
-        vm->mem[n++] = mod_word(v);
-    }
-    free(copy);
-    return n;
-}
-
 static int load_glyph_image(VM *vm, const char *path, const char *text) {
+    if (strncmp(text, "# M8 raw memory image", 21) == 0) {
+        fprintf(stderr, "%s: numeric M8 memory images are rejected in strict .mb mode; rebuild from .m8a\n", path);
+        return -1;
+    }
     vm->encoded_frames = 1;
     int n = 0;
     for (const unsigned char *p = (const unsigned char *)text; *p; p++) {
@@ -233,6 +231,10 @@ static int load_glyph_image(VM *vm, const char *path, const char *text) {
             return -1;
         }
         vm->mem[n++] = *p;
+    }
+    if (n == 0) {
+        fprintf(stderr, "%s: empty glyph source\n", path);
+        return -1;
     }
     fill_tail_classic(vm, n);
     return n;
@@ -273,12 +275,7 @@ static int load_image(VM *vm, const char *path) {
     }
     fclose(f);
 
-    int loaded;
-    if (strncmp(text, "# M8 raw memory image", 21) == 0) {
-        loaded = load_numeric_image(vm, path, text);
-    } else {
-        loaded = load_glyph_image(vm, path, text);
-    }
+    int loaded = load_glyph_image(vm, path, text);
     free(text);
     return loaded;
 }
@@ -820,9 +817,6 @@ int main(int argc, char **argv) {
             path = env_path;
         } else if (access("/sbin/init.mb", R_OK) == 0) {
             path = "/sbin/init.mb";
-        } else if (access("/sbin/init.m8i", R_OK) == 0) {
-            // Backwards compatibility for older initramfs images.
-            path = "/sbin/init.m8i";
         } else {
             die_usage(argv[0]);
         }
@@ -830,7 +824,7 @@ int main(int argc, char **argv) {
 
     int loaded = classic ? load_classic(&vm, path, 1) : load_image(&vm, path);
     if (loaded < 0) return 2;
-    prepare_extension_lineage(&vm, 1);
+    prepare_extension_lineage(&vm, loaded, 1);
     if (image_arg_index >= 0) {
         vm_install_argv(&vm, argc - image_arg_index, &argv[image_arg_index]);
     } else {

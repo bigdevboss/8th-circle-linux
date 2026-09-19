@@ -1,23 +1,47 @@
 start:
-    seta after_arg
-    storea arg_ret
-    jump copy_arg1
-after_arg:
+    loada M8_ARGC
+    storea argc_value
+    cmpm one
     branchz no_text
+    seta 1
+    storea arg_idx
+arg_loop:
+    loada arg_idx
+    cmpm argc_value
+    branchz done
+    loada arg_idx
+    cmpm one
+    branchz no_space
+    trap write 1 space space_end-space
+no_space:
+    seta after_arg_ptr
+    storea argv_ret
+    jump get_argv_ptr
+after_arg_ptr:
+    storea arg_ptr
+    seta after_copy_arg
+    storea copy_ret
+    jump copy_arg
+after_copy_arg:
     trap write 1 arg_buf A
+    loada arg_idx
+    addi 1
+    storea arg_idx
+    jump arg_loop
 no_text:
+done:
     trap write 1 newline newline_end-newline
     trap exit 0
 
-copy_arg1:
-    loada M8_ARGC
-    cmpm one
-    branchz arg_missing
+get_argv_ptr:
     loada M8_ARGV
-    addi 1
+    addm arg_idx
     storea scratch_ptr
     loadi scratch_ptr
-    branchz arg_missing
+    jumpm argv_ret
+
+copy_arg:
+    loada arg_ptr
     storea src_ptr
     seta arg_buf
     storea dst_ptr
@@ -44,11 +68,11 @@ copy_done:
     seta 0
     storei dst_ptr
     loada idx
-    jumpm arg_ret
-arg_missing:
-    seta 0
-    jumpm arg_ret
+    jumpm copy_ret
 
+space:
+    ascii " "
+space_end:
 newline:
     ascii "\n"
 newline_end:
@@ -56,7 +80,15 @@ one:
     word 1
 arg_limit:
     word 511
-arg_ret:
+argc_value:
+    word 0
+arg_idx:
+    word 0
+arg_ptr:
+    word 0
+argv_ret:
+    word 0
+copy_ret:
     word 0
 src_ptr:
     word 0

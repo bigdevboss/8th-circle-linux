@@ -9,6 +9,8 @@ INITRAMFS_BUILDER = src/toolchain/mkinitramfs.py
 MFS_BUILDER = src/toolchain/mkmfs.py
 QEMU_SMOKE = src/toolchain/qemu_smoke.py
 DIST_BUILDER = src/toolchain/mkdistro.py
+AUDIT = src/toolchain/m8audit.py
+LOADER_TESTS = src/toolchain/m8_loader_tests.py
 
 SCROLLS = src/scrolls
 RAW = src/userland
@@ -25,20 +27,27 @@ BIN_IMAGES := $(patsubst $(SCROLLS)/bin/%.m8a,$(RAW)/%.mb,$(BIN_SRCS))
 MFS_ROOT = src/mfs/root
 MFS_SRC_FILES := $(shell find $(MFS_ROOT) -type f 2>/dev/null)
 MFS_IMG = $(RAW)/root.mfs
-RAW_IMAGES = $(INIT_IMG) $(MSH_IMG) $(BIN_IMAGES) $(MFS_IMG)
+MB_IMAGES = $(INIT_IMG) $(MSH_IMG) $(BIN_IMAGES)
+RAW_IMAGES = $(MB_IMAGES) $(MFS_IMG)
 
 ROOTFS = build/rootfs
 ROOTFS_STAMP = $(ROOTFS)/.stamp
 INITRAMFS = build/8th-circle-initramfs.cpio.gz
 DIST = build/distro
 
-.PHONY: all raw mfs msh-demo init-demo init-trace trace clean distclean check glyphs rootfs initramfs distro qemu qemu-smoke tree
+.PHONY: all raw mfs glyph-audit loader-tests msh-demo init-demo init-trace trace clean distclean check glyphs rootfs initramfs distro qemu qemu-smoke tree
 
 all: $(RUNTIME) raw
 
 raw: $(RAW_IMAGES)
 
 mfs: $(MFS_IMG)
+
+glyph-audit: $(MB_IMAGES) $(INIT_DEMO_IMG) $(AUDIT)
+	python3 $(AUDIT) $(MB_IMAGES) $(INIT_DEMO_IMG)
+
+loader-tests: $(RUNTIME) $(LOADER_TESTS)
+	python3 $(LOADER_TESTS) $(RUNTIME)
 
 $(RUNTIME): src/runtime/m8.c | build
 	$(CC) $(CFLAGS) -o $@ $<
@@ -108,11 +117,11 @@ qemu-smoke: initramfs $(QEMU_SMOKE)
 tree:
 	find . -maxdepth 4 -type f | sort
 
-check: raw msh-demo init-demo initramfs
+check: raw glyph-audit loader-tests msh-demo init-demo initramfs
 	@echo "ok"
 
 clean:
 	rm -rf build
 
 distclean: clean
-	rm -f $(RAW_IMAGES) src/userland/*.m8i
+	rm -f $(RAW_IMAGES)

@@ -93,7 +93,7 @@ do_exit:
     trap exit 0
 
 do_cd:
-    loada arg_len
+    loada arg_count
     branchz cd_root
     trap chdir arg_buf
     brancherr cd_failed
@@ -111,6 +111,7 @@ run_mfsls_alias:
     storea cmd_image_ptr
     seta 0
     storea arg_len
+    storea arg_count
     jump run_external
 
 run_mfscat_alias:
@@ -119,27 +120,14 @@ run_mfscat_alias:
     jump run_external
 
 run_external:
-    loada arg_len
-    branchz run_no_arg
-    seta arg_buf
-    storea cmd_arg_ptr
-    jump run_with_argv
-run_no_arg:
-    seta 0
-    storea cmd_arg_ptr
-run_with_argv:
     loada cmd_image_ptr
     trap open A 0 0
     brancherr unknown_command
     trap close A
-    seta exec_argv+1
-    storea scratch_ptr
-    loada cmd_image_ptr
-    storei scratch_ptr
-    seta exec_argv+2
-    storea scratch_ptr
-    loada cmd_arg_ptr
-    storei scratch_ptr
+    seta after_build_exec_argv
+    storea build_argv_ret
+    jump build_exec_argv
+after_build_exec_argv:
     trap fork
     brancherr external_failed
     branchz external_child
@@ -244,6 +232,8 @@ parse_line:
     seta 0
     storea cmd_len
     storea arg_len
+    storea arg_count
+    storea arg_used
     seta line_buf
     storea src_ptr
 parse_skip_leading:
@@ -285,9 +275,24 @@ parse_cmd_done:
     storei dst_ptr
 parse_arg_skip:
     loadi src_ptr
-    branchz parse_arg_done
+    branchz parse_done
     cmpm space_char
     branchz parse_arg_skip_one
+    loada arg_count
+    cmpm arg_slots
+    branchz parse_done
+    loada arg_used
+    cmpm arg_limit
+    branchz parse_done
+    seta arg_buf
+    addm arg_used
+    storea dst_ptr
+    storea arg_store_ptr
+    seta arg_ptrs
+    addm arg_count
+    storea scratch_ptr
+    loada arg_store_ptr
+    storei scratch_ptr
     jump parse_arg_loop
 parse_arg_skip_one:
     loada src_ptr
@@ -295,29 +300,45 @@ parse_arg_skip_one:
     storea src_ptr
     jump parse_arg_skip
 parse_arg_loop:
-    loadi src_ptr
-    branchz parse_arg_done
-    loada arg_len
+    loada arg_used
     cmpm arg_limit
-    branchz parse_arg_done
-    seta arg_buf
-    addm arg_len
-    storea dst_ptr
+    branchz parse_arg_done_finish
     loadi src_ptr
+    branchz parse_arg_done_finish
+    storea tmp_ch
+    cmpm space_char
+    branchz parse_arg_done_more
+    loada tmp_ch
     storei dst_ptr
     loada src_ptr
     addi 1
     storea src_ptr
+    loada dst_ptr
+    addi 1
+    storea dst_ptr
+    loada arg_used
+    addi 1
+    storea arg_used
     loada arg_len
     addi 1
     storea arg_len
     jump parse_arg_loop
-parse_arg_done:
-    seta arg_buf
-    addm arg_len
-    storea dst_ptr
+parse_arg_done_more:
     seta 0
     storei dst_ptr
+    loada arg_used
+    addi 1
+    storea arg_used
+    loada arg_count
+    addi 1
+    storea arg_count
+    jump parse_arg_skip
+parse_arg_done_finish:
+    seta 0
+    storei dst_ptr
+    loada arg_count
+    addi 1
+    storea arg_count
 parse_done:
     jumpm parse_ret
 
@@ -392,6 +413,44 @@ after_copy_mb_suffix:
     storei copy_dst
     jumpm build_path_ret
 
+build_exec_argv:
+    seta exec_argv
+    storea scratch_ptr
+    seta m8_path
+    storei scratch_ptr
+    loada scratch_ptr
+    addi 1
+    storea scratch_ptr
+    loada cmd_image_ptr
+    storei scratch_ptr
+    loada scratch_ptr
+    addi 1
+    storea argv_dst_ptr
+    seta arg_ptrs
+    storea argv_src_ptr
+    seta 0
+    storea argv_idx
+build_argv_loop:
+    loada argv_idx
+    cmpm arg_count
+    branchz build_argv_done
+    loadi argv_src_ptr
+    storei argv_dst_ptr
+    loada argv_src_ptr
+    addi 1
+    storea argv_src_ptr
+    loada argv_dst_ptr
+    addi 1
+    storea argv_dst_ptr
+    loada argv_idx
+    addi 1
+    storea argv_idx
+    jump build_argv_loop
+build_argv_done:
+    seta 0
+    storei argv_dst_ptr
+    jumpm build_argv_ret
+
 copy_bytes:
     seta 0
     storea idx
@@ -427,6 +486,7 @@ help_msg:
     ascii "  cd [PATH]   - change directory, bare cd goes to /\n"
     ascii "External M8 commands are loaded from /bin/NAME.mb.\n"
     ascii "Aliases: mfsls -> mfs.ls, mfscat -> mfs.cat.\n"
+    ascii "MFS commands: mfs.info, mfs.stat NAME.\n"
 help_msg_end:
 exit_msg:
     ascii "[8CL:msh] exiting; PID 1 will reopen the circle.\n"
@@ -486,7 +546,7 @@ mfs_cat_image:
 empty_env:
     word 0
 exec_argv:
-    ptrv m8_path cmd_path_buf
+    zero 12
 lf_char:
     word 10
 cr_char:
@@ -499,11 +559,17 @@ cmd_limit:
     word 95
 arg_limit:
     word 511
+arg_slots:
+    word 8
 line_len:
     word 0
 cmd_len:
     word 0
 arg_len:
+    word 0
+arg_count:
+    word 0
+arg_used:
     word 0
 read_ret:
     word 0
@@ -519,9 +585,9 @@ build_path_ret:
     word 0
 copy_ret:
     word 0
-cmd_image_ptr:
+build_argv_ret:
     word 0
-cmd_arg_ptr:
+cmd_image_ptr:
     word 0
 child_status:
     word 0
@@ -535,6 +601,12 @@ copy_dst:
     word 0
 copy_len:
     word 0
+argv_idx:
+    word 0
+argv_src_ptr:
+    word 0
+argv_dst_ptr:
+    word 0
 src_ptr:
     word 0
 pat_ptr:
@@ -547,6 +619,8 @@ tmp_ch:
     word 0
 scratch_ptr:
     word 0
+arg_store_ptr:
+    word 0
 input_byte:
     word 0
 line_buf:
@@ -555,5 +629,7 @@ cmd_buf:
     zero 96
 arg_buf:
     zero 512
+arg_ptrs:
+    zero 9
 cmd_path_buf:
     zero 512

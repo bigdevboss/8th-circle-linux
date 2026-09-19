@@ -1,19 +1,55 @@
 start:
-    seta after_arg
-    storea arg_ret
-    jump copy_arg1
-after_arg:
+    loada M8_ARGC
+    storea argc_value
+    cmpm one
     branchz use_dot
-    seta path_buf
+    seta 1
+    storea arg_idx
+ls_arg_loop:
+    loada arg_idx
+    cmpm argc_value
+    branchz done
+    seta after_arg_ptr
+    storea argv_ret
+    jump get_argv_ptr
+after_arg_ptr:
     storea ls_path_ptr
-    jump ls_run
+    seta after_ls_one
+    storea ls_ret
+    jump ls_one
+after_ls_one:
+    loada ls_status
+    branchnz failed
+    loada arg_idx
+    addi 1
+    storea arg_idx
+    jump ls_arg_loop
 use_dot:
     seta dot_path
     storea ls_path_ptr
-ls_run:
+    seta after_ls_dot
+    storea ls_ret
+    jump ls_one
+after_ls_dot:
+    loada ls_status
+    branchnz failed
+done:
+    trap exit 0
+failed:
+    trap write 2 failed_msg failed_msg_end-failed_msg
+    trap exit 1
+
+get_argv_ptr:
+    loada M8_ARGV
+    addm arg_idx
+    storea scratch_ptr
+    loadi scratch_ptr
+    jumpm argv_ret
+
+ls_one:
     loada ls_path_ptr
     trap open A 0 0
-    brancherr failed
+    brancherr ls_one_failed
     storea ls_fd
 read_loop:
     loada ls_fd
@@ -64,53 +100,16 @@ after_reclen:
 close_ok:
     loada ls_fd
     trap close A
-    trap exit 0
+    seta 0
+    storea ls_status
+    jumpm ls_ret
 read_failed:
     loada ls_fd
     trap close A
-failed:
-    trap write 2 failed_msg failed_msg_end-failed_msg
-    trap exit 1
-
-copy_arg1:
-    loada M8_ARGC
-    cmpm one
-    branchz arg_missing
-    loada M8_ARGV
-    addi 1
-    storea scratch_ptr
-    loadi scratch_ptr
-    branchz arg_missing
-    storea src_ptr
-    seta path_buf
-    storea dst_ptr
-    seta 0
-    storea idx
-copy_loop:
-    loada idx
-    cmpm path_limit
-    branchz copy_done
-    loadi src_ptr
-    branchz copy_done
-    storei dst_ptr
-    loada src_ptr
-    addi 1
-    storea src_ptr
-    loada dst_ptr
-    addi 1
-    storea dst_ptr
-    loada idx
-    addi 1
-    storea idx
-    jump copy_loop
-copy_done:
-    seta 0
-    storei dst_ptr
-    loada idx
-    jumpm arg_ret
-arg_missing:
-    seta 0
-    jumpm arg_ret
+ls_one_failed:
+    seta 1
+    storea ls_status
+    jumpm ls_ret
 
 dir_is_dot_entry:
     loada dir_name_ptr
@@ -206,11 +205,17 @@ one:
     word 1
 dot_char:
     word 46
-path_limit:
-    word 511
 dir_name_limit:
     word 255
-arg_ret:
+argc_value:
+    word 0
+arg_idx:
+    word 0
+argv_ret:
+    word 0
+ls_ret:
+    word 0
+ls_status:
     word 0
 ls_fd:
     word 0
@@ -246,8 +251,6 @@ idx:
     word 0
 scratch_ptr:
     word 0
-path_buf:
-    zero 512
 dir_buf:
     zero 4096
 dir_name_buf:
