@@ -24,7 +24,7 @@ On Debian or Ubuntu-ish systems:
 sudo apt install build-essential python3 qemu-system-x86 linux-image-amd64
 ```
 
-Build the runtime, printable userland images, MFS v0 image, rootfs, and initramfs:
+Build the runtime, printable userland images, MFS v1 image plus manifest, rootfs, and initramfs:
 
 ```sh
 make check
@@ -121,7 +121,7 @@ Welcome to 8th circle Linux! Type 'help' to see msh commands.
 - PTY-driven QEMU smoke test through `make qemu-smoke`.
 - Strict glyph audit through `make glyph-audit`.
 - Negative loader checks through `make loader-tests`.
-- MFS v0 image built from `src/mfs/root/` and shipped as `/mfs/root.mfs`.
+- MFS v1 image built from `src/mfs/root/` and shipped as `/mfs/root.mfs`, with a generated scroll manifest next to it.
 
 Inside `msh`:
 
@@ -162,7 +162,7 @@ The shell now has a tiny PATH-like rule: a command named `NAME` launches `/bin/N
 /bin/mfs.stat.mb
 ```
 
-`echo.mb`, `cat.mb`, and `ls.mb` now handle multiple argv entries instead of only seeing one tail string. `cat.mb` and `echo.mb` use unrolled argv slot probes, and `cat.mb` has zero friendly arithmetic debt. `echo.mb` prints one byte per `trap write` and keeps a single `addi 1` for the source pointer. `ls.mb` calls `getdents64` and parses `linux_dirent64` records in M8. MFS commands read `/mfs/root.mfs`, walk the MFS v0 header/table, print metadata, and copy payload bytes in M8. The C6 pass replaced fixed-offset pointer arithmetic with label expressions such as `seta mfs_buf+512` and moved MFS name and payload output to byte-per-trap writes.
+`echo.mb`, `cat.mb`, and `ls.mb` now handle multiple argv entries instead of only seeing one tail string. `cat.mb` and `echo.mb` use unrolled argv slot probes, and `cat.mb` has zero friendly arithmetic debt. `echo.mb` prints one byte per `trap write` and keeps a single `addi 1` for the source pointer. `ls.mb` calls `getdents64` and parses `linux_dirent64` records in M8. MFS commands read `/mfs/root.mfs` and copy payload bytes in M8. The C6 pass replaced fixed-offset pointer arithmetic with label expressions such as `seta mfs_buf+512` and moved MFS name and payload output to byte-per-trap writes. C8 moved the MFS tools onto the v1 format: entry walks are unrolled static slot bases, payload bounds come from generated manifest words, and only `mfs.info` still decodes header numbers from the image bytes.
 
 Friendly aliases remain:
 
@@ -221,7 +221,7 @@ make glyph-audit
 
 `make check` runs the audit and the negative loader tests, so accidental numeric `.mb` files should fail before QEMU ever boots.
 
-## MFS v0 seed
+## MFS v1 seed
 
 MFS is the cursed filesystem direction for the project. The current version is an image, not a mounted kernel filesystem.
 
@@ -235,11 +235,14 @@ The source tree is intentionally tiny:
 src/mfs/root/etc/issue
 ```
 
-The generated image is:
+The generated image and manifest are:
 
 ```text
 src/userland/root.mfs
+src/userland/mfs-manifest.m8a
 ```
+
+MFS v1 keeps the 512-byte header and 128-byte entries, but the entry table is now a fixed 16 slots, zero-filled, with payloads always starting at byte 2560. The fixed slot count is the sentinel contract: tools walk all 16 static slot bases and unused slots have empty names, so no runtime entry count or stride arithmetic is needed. `tools/mkmfs.py` refuses to build images with more than 16 files.
 
 The initramfs ships it as:
 
@@ -253,16 +256,16 @@ Inside QEMU:
 msh> mfsls
 etc/issue
 msh> mfs.info
-MFS8 v0 image
+MFS8 v1 image
 entries: 1
-image-size: 1099
+image-size: 2635
 entry-size: 128
 files:
 etc/issue
 msh> mfs.stat etc/issue
 name: etc/issue
 size: 75
-offset: 1024
+offset: 2560
 msh> mfscat etc/issue
 8th Circle Linux MFS image
 The filesystem is not sane, and neither are we.
@@ -274,7 +277,7 @@ The filesystem is not sane, and neither are we.
 src/
   runtime/      M8 VM/runtime, currently C
   userland/     generated printable .mb programs shipped by the distro
-  mfs/root/     source tree for the MFS v0 image
+  mfs/root/     source tree for the MFS v1 image
 scrolls/        human-readable .m8a source scrolls
 scrolls/bin/    external command source scrolls
 tools/          assembler, MFS builder, initramfs builder, QEMU tooling
@@ -290,14 +293,16 @@ Important files:
 - `tools/m8_loader_tests.py` - negative tests for bad `.mb` files.
 - `tools/m8crazy.py` - crazy-op, ternary exploration, and C5 planner helper.
 - `tools/m8_arith_audit.py` - counts friendly arithmetic debt in scrolls.
-- `tools/mkmfs.py` - MFS v0 image builder.
+- `tools/mkmfs.py` - MFS v1 image and manifest builder.
+- `tools/mkoracle.py` - msh filesystem equality oracle tree builder.
 - `tools/mkinitramfs.py` - pure-Python `newc` initramfs packer.
 - `tools/mkdistro.py` - copies a kernel and initramfs into a local boot bundle.
 - `tools/qemu_smoke.py` - serial-console QEMU smoke test.
 - `src/userland/init.mb` - printable M8 init program shipped as `/sbin/init.mb`.
 - `src/userland/msh.mb` - printable M8 shell program shipped as `/bin/msh.mb`.
 - `src/userland/{pwd,issue,echo,cat,ls,mfs.ls,mfs.cat,mfs.info,mfs.stat}.mb` - external command images shipped under `/bin`.
-- `src/userland/root.mfs` - MFS v0 image shipped as `/mfs/root.mfs`.
+- `src/userland/root.mfs` - MFS v1 image shipped as `/mfs/root.mfs`.
+- `src/userland/mfs-manifest.m8a` - generated per-slot manifest words included by `mfs.cat.m8a` and `mfs.stat.m8a`.
 - `docs/m8-spec.md` - current M8 dialect and trap ABI notes.
 
 ## Crazy-op groundwork
@@ -316,7 +321,7 @@ make crazy-entry-lab
 make crazy-ritual-test
 ```
 
-`arithmetic-audit` counts helper-op usage in `scrolls/`. `arithmetic-audit-details` prints the exact lines. `arithmetic-audit-budget` currently fails above `133`, so C5 through C7 debt reductions do not silently regress. `crazy-lab` prints the crazy table, word transforms, rotations, and a tiny byte-target search. `crazy-word-lab` tries exact 10-trit word targets in the older toy graph.
+`arithmetic-audit` counts helper-op usage in `scrolls/`. `arithmetic-audit-details` prints the exact lines. `arithmetic-audit-budget` currently fails above `35`, so C5 through C11 debt reductions do not silently regress. `crazy-lab` prints the crazy table, word transforms, rotations, and a tiny byte-target search. `crazy-word-lab` tries exact 10-trit word targets in the older toy graph.
 
 `crazy-planner-lab` is stricter. It separates generated D-runway steps from direct cell rewrites. The runway model says `p seed=N` computes `crazy(A, N)` from a generated seed cell and `* seed=N` rotates that seed into `A`. The direct rewrite model solves one final `p` on a mutable cell. For example, it proves that cell value `58017` can become `58018` with A mask `27`, then shows a four-step runway to materialize that mask. It also shows why this is not a generic pointer increment yet: values such as `58019 -> 58020` are blocked by the trit table.
 
@@ -337,7 +342,19 @@ The first C5 cleanup moved `cat`, `echo`, and `ls` to argv-vector cursors instea
 
 C6 lowered the debt from `180` to `150` with three layout idioms: unrolled argv slot probes plus byte-per-trap output in `echo.m8a` (`5` to `1`), label arithmetic such as `seta mfs_buf+512` and direct slot loads `loada M8_ARGVEC+1` in the MFS tools, and byte-per-trap name and payload output. `mfs.ls` went `9` to `4`, `mfs.cat` `27` to `19`, `mfs.info` `33` to `26`, and `mfs.stat` `40` to `34`. The metric is honest about what moved: these wins come from unrolling, layout, and syscall patterns, not from new crazy math. The crazy side of C6 proves the machinery instead: `crazyinc-cell` rewrites a live program cell through a classic `j` hop, under the same runtime and the same audit as the debt work. Merging the two, for example a crazy-driven pointer walk, is later work.
 
-C7 continued with layout work aimed at the shell. `msh.m8a` dropped from `49` to `33` debt lines by replacing index-plus-limit loops with write cursors and static end-pointer words (`line_end`, `cmd_end`, `arg_end`), comparing strings directly against NUL sentinels instead of carrying compare lengths, and walking the exec argument vector through a NUL-terminated `arg_ptrs` table instead of a counted loop. `read_line` now rejects CR and LF at read time, so the old trim routine is gone. `mfs.cat` uses the same cursor pattern for its argument copy (`18` debt). The only remaining arithmetic in `msh` is `addi` stepping, one `subm` for the command length, and `cmpm` bounds; the `addm` and `subi` helpers are gone from the shell. Total debt: `133`.
+C7 continued with layout work aimed at the shell. `msh.m8a` dropped from `49` to `33` debt lines by replacing index-plus-limit loops with write cursors and static end-pointer words (`line_end`, `cmd_end`, `arg_end`), comparing strings directly against NUL sentinels instead of carrying compare lengths, and walking the exec argument vector through a NUL-terminated `arg_ptrs` table instead of a counted loop. `read_line` now rejects CR and LF at read time, so the old trim routine is gone. `mfs.cat` uses the same cursor pattern for its argument copy (`18` debt). The only remaining arithmetic in `msh` is `addi` stepping, one `subm` for the command length, and `cmpm` bounds; the `addm` and `subi` helpers are gone from the shell. Total debt after C7: `133`.
+
+C8 moved the MFS tools onto the v1 format and its manifest. `mfs.ls` and `mfs.info` walk 16 unrolled static slot bases (`seta mfs_buf+512+128k` style), so the entry count compare, the `addi 128` stride, and the index stepper are gone; unused slots have empty names and are skipped silently. `mfs.cat` and `mfs.stat` include the generated manifest, which gives each slot static payload-source, payload-end, size, and offset words, so the `read_u16` decode loops and the runtime `addi 96`/`addi 100` field offsets are gone too. `mfs.cat` bounds its payload loop against a manifest end word instead of a runtime size. `mfs.info` stays the honest verifier: it reads the entry count and entry size as single image bytes and decodes the 16-bit image size with one small loop. Results: `mfs.ls` `4` to `1`, `mfs.cat` `18` to `8`, `mfs.info` `26` to `22`, `mfs.stat` `34` to `26`. Total debt: `108`. The manifest is part of the MFS distribution, like a DTB beside a kernel; payload bytes, names, and the header still come from the real image at runtime.
+
+C9 rebuilt `msh` around chase buffers. Every byte buffer is a `zero N` region whose cells are pointer-chain links, restored at runtime by the new unrolled `rechain LABEL COUNT` assembler macro; a write cursor then stores each byte with `loadi`/`storei` chasing and no stepping arithmetic. Reading and parsing are fused into one pass: three read loops double as parser states (between words, in the command word, in an argument word), spaces NUL-terminate arguments in place, and the command name is double-written into a name chain and into the static `/bin/` path region, with `.mb` appended only at external dispatch. The `exec` argv slots are a chain too: each argument start stores its pointer into the next slot and the first unfilled slot is zeroed as the terminator. The arg buffer chain self-advances across lines and is rechained only when exhausted; an overflow drops the overflowing argument and drains the rest of the line. `msh.m8a` dropped from `33` to `14` debt lines: what remains is one `cmpm` per byte classifier (`LF`, `CR`, space) in each loop, the drain loop's `LF` check, the `cmd_eq` loop's two cursor steps and one compare, and one `subm` for the command length. Total debt: `89`. The `cmpm` classifiers were the honest floor until C10.
+
+C10 closed the classifier question. Research result first: classic crazy ops cannot run inside parser loops, because the VM data pointer D advances one cell per executed instruction, so after any variable history (a read loop, a parser) D is unpredictable at plan time, and every classic op (`j`, `i`, `*`, `p`) reads or writes `mem[D]`. The `crazyinc` rituals work only because they run straight-line from program start with a planned instruction count. Without a D-synchronization primitive, and building one needs instruction counting, classic ops stay confined to planned straight-line rituals.
+
+The shipping solution is the filesystem equality oracle. msh classifies every input byte and compares builtin-name characters with `open(2)` probes: a path built from the byte opens successfully only when a matching magic file exists. The tree ships in the rootfs: `/.m8/x` holds the three separator-named files for the hot test, `/.m8/n`, `/.m8/r`, and `/.m8/s` distinguish which separator a byte is, and `/.m8/eq/<C>/<C>e` encodes the builtin pattern characters. A suffix character defeats path collapse for `/` and `.`, NUL is pre-checked with `branchz`, and every successful probe fd is closed. `tools/mkoracle.py` builds the tree into the rootfs; host test runs need `sudo python3 tools/mkoracle.py /` once. Builtin dispatch is now unrolled per character with the oracle, `unknown_command` prints the name through unrolled per-cell writes that stop at NUL, `cmd_eq` and `cmd_len` are deleted, and the empty-line check uses a `cmd_started` flag. `msh.m8a` has zero friendly arithmetic helper lines. Total debt: `75`.
+
+C11 moved number printing onto the kernel-as-ALU. `scrolls/lib/print_fdec.m8a` is a shared library scroll included by `mfs.info.m8a` and `mfs.stat.m8a` in place of the old subtract-ten `print_dec`, with zero friendly arithmetic. The value arrives in A and becomes a file size with one bounded write: open `/tmp/8cl-dec-a`, `dup2` it to static fd 7, write A bytes from the scratch cell region. Each decimal position is an ascending ladder on that one fd: `read(p-1)` then `read(1)` proves at least p bytes remain, and each successful rung consumes exactly p bytes because the read offset advances, so the first failing rung names the digit. The remainder is carried to the next position by copying the unconsumed bytes into `/tmp/8cl-dec-b`, alternating the two files across positions 1000, 100, 10, and 1. Leading zeros are suppressed by a flag; a zero value prints a single `0`. `mfs.info` also prints the honest image size now: `loada mfs_len` reads the byte count the initial image read returned, instead of decoding the 16-bit header field. `mfs.info` dropped from `22` to `1` debt line and `mfs.stat` from `26` to `7`. Total debt: `35`. `make print-fdec-test` builds and runs `scrolls/tests/print_fdec_demo.m8a`, which prints eighteen boundary values including `0`, `9`, `10`, `999`, `1000`, and `8192`.
+
+The remaining `35` debt lines are declared blessed OS glue. `ls` (`17`) walks variable-length `linux_dirent64` records whose `d_reclen` is runtime kernel data, `mfs.cat` (`8`) and `mfs.stat` (`7`) walk runtime-loaded manifest and argv data with byte-equality compares, and `mfs.info`, `mfs.ls`, and `echo` carry one cursor step each. These are kernel ABI shapes and runtime-pair comparisons, not arithmetic we chose to keep.
 
 `scrolls/tests/chase_demo.m8a` is the C7 pointer-chase proof. A chain of cells holds the absolute address of the next cell, so `loadi cur` plus `storea cur` advances the cursor with zero arithmetic, and a stored `0` ends the walk. The payload lives in the addresses themselves: each node sits at an address whose low byte is the character it prints, `591` for `O`, `587` for `K`, `545` for `!`, written out as one byte through `trap write`. `make chase-test` builds, audits, and runs it, expecting `OK!`.
 
@@ -349,7 +366,7 @@ make glyph-audit  # verify .mb files are printable valid-source glyph streams
 make loader-tests # verify bad .mb formats are rejected by the runtime
 make arithmetic-audit # count add/sub/compare helper usage in scrolls
 make arithmetic-audit-details # show line-level arithmetic helper usage
-make arithmetic-audit-budget # fail if helper debt rises above the C6 budget
+make arithmetic-audit-budget # fail if helper debt rises above the C11 budget
 make crazy-lab    # print crazy-op table and a few ternary probes
 make crazy-word-lab # try toy exact-word searches and reachability profiles
 make crazy-planner-lab # run stricter D-runway and direct-p planning probes
@@ -357,6 +374,8 @@ make crazy-route-lab # lay a planned ritual onto straight-line C/D tracks
 make crazy-entry-lab # plan a full straight-line entry scroll for 58017 -> 58018, plus a live-cell plan
 make crazy-ritual-test # build and run real crazy-ritual test scrolls
 make chase-test   # build and run the zero-arithmetic pointer-chase demo
+make chase-buf-test # build and run the zero-arithmetic chase-buffer demo
+make print-fdec-test # build and run the file-size ALU decimal printer test
 make mfs          # rebuild only root.mfs
 make msh-demo     # run msh on the host through the runtime
 make init-demo    # run a small host-side init demo
@@ -376,19 +395,19 @@ Current checkpoint:
 - The initramfs boots in QEMU.
 - PID 1 does not exit.
 - `msh` is usable enough for basic navigation, file reads, and multi-argument external commands.
-- MFS v0 exists and is visible from `msh`.
+- MFS v1 exists and is visible from `msh`.
 - The QEMU smoke test passes. It validates `pwd`, multi-path `ls`, multi-file `cat`, multi-word `echo`, `issue`, `mfsls`, `mfs.info`, `mfs.stat`, and `mfscat`.
 
 Still cursed and unfinished:
 
 - The kernel is not built by this repo yet.
 - There is no ISO, installer, package manager, or real disk image.
-- MFS v0 is read-only, but `mfs.ls.mb`, `mfs.cat.mb`, `mfs.info.mb`, and `mfs.stat.mb` are now standalone command images.
+- MFS v1 is read-only, but `mfs.ls.mb`, `mfs.cat.mb`, `mfs.info.mb`, and `mfs.stat.mb` are now standalone command images, with `mfs.cat` and `mfs.stat` driven by the generated slot manifest.
 - The shell no longer uses shell-specific C helper traps; it relies on the normal syscall bridge and primitive M8 ops.
 - `.mb` userland is printable, source-validated M8 glyph source now, not numeric VM dumps.
 - The runtime no longer accepts old decimal `.mb` memory images in normal mode.
 - Command lookup is PATH-lite: `NAME` maps to `/bin/NAME.mb`, with up to eight parsed arguments and special aliases for `mfsls` and `mfscat`.
-- C5 through C7 ritual and layout work has landed: `make arithmetic-audit` tracks friendly arithmetic helper debt, `make arithmetic-audit-details` shows exact lines, `make arithmetic-audit-budget` guards the current `133` budget, and `make crazy-lab`, `make crazy-word-lab`, `make crazy-planner-lab`, `make crazy-route-lab`, and `make crazy-entry-lab` explore Malbolge-style crazy/rotate transforms. `make crazy-ritual-test` builds and runs the zero-debt crazy ritual scrolls, the `crazyinc` assembler macro, and the `crazyinc-cell` live-cell variant. `make chase-test` runs the zero-arithmetic pointer-chase demo. C6 and C7 lowered userland debt from `180` to `133` through unrolled argv slots, label arithmetic, byte-per-trap output, write cursors, NUL sentinels, and end-pointer compares.
+- C5 through C11 ritual and layout work has landed: `make arithmetic-audit` tracks friendly arithmetic helper debt, `make arithmetic-audit-details` shows exact lines, `make arithmetic-audit-budget` guards the current `35` budget, and `make crazy-lab`, `make crazy-word-lab`, `make crazy-planner-lab`, `make crazy-route-lab`, and `make crazy-entry-lab` explore Malbolge-style crazy/rotate transforms. `make crazy-ritual-test` builds and runs the zero-debt crazy ritual scrolls, the `crazyinc` assembler macro, and the `crazyinc-cell` live-cell variant. `make chase-test` runs the zero-arithmetic pointer-chase demo and `make chase-buf-test` runs the zero-arithmetic chase-buffer demo (`rechain` plus chasing write cursor). C6 through C11 lowered userland debt from `180` to `35` through unrolled argv slots, label arithmetic, byte-per-trap output, write cursors, NUL sentinels, end-pointer compares, the MFS v1 static slot table, generated manifest words, chase-buffer cursors, the filesystem equality oracle, and the file-size ALU. msh itself is at zero helper lines.
 
 ## License
 

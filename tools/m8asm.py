@@ -199,6 +199,34 @@ def item_tick_cost(kind: str, args: list[str], line_no: int) -> int:
     raise SystemExit(f"line {line_no}: unknown directive/instruction {kind!r}")
 
 
+def load_source(path: Path, stack: tuple[str, ...] = ()) -> str:
+    """Read a source file and splice `include "path"` lines recursively.
+
+    Include paths resolve relative to the including file first, then
+    relative to the current working directory. Cycles are rejected.
+    """
+    resolved = path.resolve()
+    key = str(resolved)
+    if key in stack:
+        chain = " -> ".join(stack + (key,))
+        raise SystemExit(f"include cycle: {chain}")
+    out: list[str] = []
+    for original in resolved.read_text().splitlines():
+        stripped = original.strip()
+        m = re.match(r'^include\s+"([^"]+)"$', stripped)
+        if m:
+            target = Path(m.group(1))
+            if not target.is_absolute():
+                candidate = resolved.parent / target
+                if not candidate.exists():
+                    candidate = Path.cwd() / target
+                target = candidate
+            out.append(load_source(target, stack + (key,)))
+        else:
+            out.append(original)
+    return "\n".join(out)
+
+
 def parse_source(text: str) -> tuple[list[Item], dict[str, int]]:
     """Two-phase parse.
 
@@ -247,6 +275,36 @@ def parse_source(text: str) -> tuple[list[Item], dict[str, int]]:
             op = "storea"
         elif op == "lda":
             op = "loada"
+        elif op == "rechain":
+            # Codegen macro: emit an unrolled pointer-chain initializer for
+            # LABEL. Cell k of the chain receives the address of cell k+1
+            # (`seta LABEL+k+1; storea LABEL+k`), and the last cell receives
+            # 0 as the walk terminator. Buffers declared as `zero N` get
+            # their links restored at runtime by this macro; no friendly
+            # arithmetic is involved.
+            if len(args) != 2:
+                raise SystemExit(f"line {line_no}: rechain expects LABEL COUNT")
+            chain_label, count_s = args
+            if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", chain_label):
+                raise SystemExit(
+                    f"line {line_no}: rechain label must be a plain label, got {chain_label!r}"
+                )
+            try:
+                chain_count = int(count_s, 0)
+            except ValueError:
+                raise SystemExit(
+                    f"line {line_no}: rechain count must be an int, got {count_s!r}"
+                ) from None
+            if chain_count < 1:
+                raise SystemExit(f"line {line_no}: rechain count must be positive")
+            macro_pending = pending
+            for k in range(chain_count):
+                link = "0" if k == chain_count - 1 else f"{chain_label}+{k + 1}"
+                raw.append(("seta", [link], line_no, original, macro_pending))
+                macro_pending = []
+                raw.append(("storea", [f"{chain_label}+{k}"], line_no, original, []))
+            pending = []
+            continue
 
         raw.append((op, args, line_no, original, pending))
         pending = []
@@ -613,7 +671,7 @@ def main() -> int:
     if len(XLAT1) != 94:
         raise SystemExit(f"internal error: XLAT1 has length {len(XLAT1)}, expected 94")
 
-    text = args.input.read_text()
+    text = load_source(args.input)
     items, labels = parse_source(text)
     image, final_labels, prefix_len = assemble_glyph(items, labels)
 

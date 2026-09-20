@@ -11,47 +11,232 @@ after_arg:
 after_load:
     loada mfs_status
     branchnz failed
-    seta mfs_buf+12
-    storea scratch_ptr
-    loadi scratch_ptr
-    storea mfs_entry_count
+stat_try_0:
     seta mfs_buf+512
     storea mfs_entry_ptr
-    seta 0
-    storea mfs_entry_idx
-find_loop:
-    loada mfs_entry_idx
-    cmpm mfs_entry_count
-    branchz not_found
-    seta after_match
+    seta stat_after_0
     storea mfs_match_ret
     jump mfs_name_matches_path
-after_match:
-    branchnz found
-    loada mfs_entry_ptr
-    addi 128
+stat_after_0:
+    branchnz stat_found_0
+stat_try_1:
+    seta mfs_buf+640
     storea mfs_entry_ptr
-    loada mfs_entry_idx
-    addi 1
-    storea mfs_entry_idx
-    jump find_loop
-found:
-    loada mfs_entry_ptr
-    addi 96
-    storea u16_ptr
-    seta after_offset
-    storea u16_ret
-    jump read_u16
-after_offset:
-    storea mfs_file_offset
-    loada mfs_entry_ptr
-    addi 100
-    storea u16_ptr
-    seta after_size
-    storea u16_ret
-    jump read_u16
-after_size:
-    storea mfs_file_size
+    seta stat_after_1
+    storea mfs_match_ret
+    jump mfs_name_matches_path
+stat_after_1:
+    branchnz stat_found_1
+stat_try_2:
+    seta mfs_buf+768
+    storea mfs_entry_ptr
+    seta stat_after_2
+    storea mfs_match_ret
+    jump mfs_name_matches_path
+stat_after_2:
+    branchnz stat_found_2
+stat_try_3:
+    seta mfs_buf+896
+    storea mfs_entry_ptr
+    seta stat_after_3
+    storea mfs_match_ret
+    jump mfs_name_matches_path
+stat_after_3:
+    branchnz stat_found_3
+stat_try_4:
+    seta mfs_buf+1024
+    storea mfs_entry_ptr
+    seta stat_after_4
+    storea mfs_match_ret
+    jump mfs_name_matches_path
+stat_after_4:
+    branchnz stat_found_4
+stat_try_5:
+    seta mfs_buf+1152
+    storea mfs_entry_ptr
+    seta stat_after_5
+    storea mfs_match_ret
+    jump mfs_name_matches_path
+stat_after_5:
+    branchnz stat_found_5
+stat_try_6:
+    seta mfs_buf+1280
+    storea mfs_entry_ptr
+    seta stat_after_6
+    storea mfs_match_ret
+    jump mfs_name_matches_path
+stat_after_6:
+    branchnz stat_found_6
+stat_try_7:
+    seta mfs_buf+1408
+    storea mfs_entry_ptr
+    seta stat_after_7
+    storea mfs_match_ret
+    jump mfs_name_matches_path
+stat_after_7:
+    branchnz stat_found_7
+stat_try_8:
+    seta mfs_buf+1536
+    storea mfs_entry_ptr
+    seta stat_after_8
+    storea mfs_match_ret
+    jump mfs_name_matches_path
+stat_after_8:
+    branchnz stat_found_8
+stat_try_9:
+    seta mfs_buf+1664
+    storea mfs_entry_ptr
+    seta stat_after_9
+    storea mfs_match_ret
+    jump mfs_name_matches_path
+stat_after_9:
+    branchnz stat_found_9
+stat_try_10:
+    seta mfs_buf+1792
+    storea mfs_entry_ptr
+    seta stat_after_10
+    storea mfs_match_ret
+    jump mfs_name_matches_path
+stat_after_10:
+    branchnz stat_found_10
+stat_try_11:
+    seta mfs_buf+1920
+    storea mfs_entry_ptr
+    seta stat_after_11
+    storea mfs_match_ret
+    jump mfs_name_matches_path
+stat_after_11:
+    branchnz stat_found_11
+stat_try_12:
+    seta mfs_buf+2048
+    storea mfs_entry_ptr
+    seta stat_after_12
+    storea mfs_match_ret
+    jump mfs_name_matches_path
+stat_after_12:
+    branchnz stat_found_12
+stat_try_13:
+    seta mfs_buf+2176
+    storea mfs_entry_ptr
+    seta stat_after_13
+    storea mfs_match_ret
+    jump mfs_name_matches_path
+stat_after_13:
+    branchnz stat_found_13
+stat_try_14:
+    seta mfs_buf+2304
+    storea mfs_entry_ptr
+    seta stat_after_14
+    storea mfs_match_ret
+    jump mfs_name_matches_path
+stat_after_14:
+    branchnz stat_found_14
+stat_try_15:
+    seta mfs_buf+2432
+    storea mfs_entry_ptr
+    seta stat_after_15
+    storea mfs_match_ret
+    jump mfs_name_matches_path
+stat_after_15:
+    branchnz stat_found_15
+    jump not_found
+stat_found_0:
+    loada mfs_entry_0_size
+    storea stat_size
+    loada mfs_entry_0_offset
+    storea stat_offset
+    jump stat_print_meta
+stat_found_1:
+    loada mfs_entry_1_size
+    storea stat_size
+    loada mfs_entry_1_offset
+    storea stat_offset
+    jump stat_print_meta
+stat_found_2:
+    loada mfs_entry_2_size
+    storea stat_size
+    loada mfs_entry_2_offset
+    storea stat_offset
+    jump stat_print_meta
+stat_found_3:
+    loada mfs_entry_3_size
+    storea stat_size
+    loada mfs_entry_3_offset
+    storea stat_offset
+    jump stat_print_meta
+stat_found_4:
+    loada mfs_entry_4_size
+    storea stat_size
+    loada mfs_entry_4_offset
+    storea stat_offset
+    jump stat_print_meta
+stat_found_5:
+    loada mfs_entry_5_size
+    storea stat_size
+    loada mfs_entry_5_offset
+    storea stat_offset
+    jump stat_print_meta
+stat_found_6:
+    loada mfs_entry_6_size
+    storea stat_size
+    loada mfs_entry_6_offset
+    storea stat_offset
+    jump stat_print_meta
+stat_found_7:
+    loada mfs_entry_7_size
+    storea stat_size
+    loada mfs_entry_7_offset
+    storea stat_offset
+    jump stat_print_meta
+stat_found_8:
+    loada mfs_entry_8_size
+    storea stat_size
+    loada mfs_entry_8_offset
+    storea stat_offset
+    jump stat_print_meta
+stat_found_9:
+    loada mfs_entry_9_size
+    storea stat_size
+    loada mfs_entry_9_offset
+    storea stat_offset
+    jump stat_print_meta
+stat_found_10:
+    loada mfs_entry_10_size
+    storea stat_size
+    loada mfs_entry_10_offset
+    storea stat_offset
+    jump stat_print_meta
+stat_found_11:
+    loada mfs_entry_11_size
+    storea stat_size
+    loada mfs_entry_11_offset
+    storea stat_offset
+    jump stat_print_meta
+stat_found_12:
+    loada mfs_entry_12_size
+    storea stat_size
+    loada mfs_entry_12_offset
+    storea stat_offset
+    jump stat_print_meta
+stat_found_13:
+    loada mfs_entry_13_size
+    storea stat_size
+    loada mfs_entry_13_offset
+    storea stat_offset
+    jump stat_print_meta
+stat_found_14:
+    loada mfs_entry_14_size
+    storea stat_size
+    loada mfs_entry_14_offset
+    storea stat_offset
+    jump stat_print_meta
+stat_found_15:
+    loada mfs_entry_15_size
+    storea stat_size
+    loada mfs_entry_15_offset
+    storea stat_offset
+    jump stat_print_meta
+stat_print_meta:
     trap write 1 name_label name_label_end-name_label
     loada path_len
     trap write 1 path_buf A
@@ -59,14 +244,14 @@ after_size:
     trap write 1 size_label size_label_end-size_label
     seta after_print_size
     storea print_ret
-    loada mfs_file_size
+    loada stat_size
     jump print_dec
 after_print_size:
     trap write 1 newline newline_end-newline
     trap write 1 offset_label offset_label_end-offset_label
     seta after_print_offset
     storea print_ret
-    loada mfs_file_offset
+    loada stat_offset
     jump print_dec
 after_print_offset:
     trap write 1 newline newline_end-newline
@@ -165,164 +350,18 @@ match_success:
     seta 1
     jumpm mfs_match_ret
 
-read_u16:
-    loadi u16_ptr
-    storea u16_value
-    loada u16_ptr
-    addi 1
-    storea scratch_ptr
-    loadi scratch_ptr
-    storea u16_high
-read_u16_loop:
-    loada u16_high
-    branchz read_u16_done
-    loada u16_value
-    addi 256
-    storea u16_value
-    loada u16_high
-    subi 1
-    storea u16_high
-    jump read_u16_loop
-read_u16_done:
-    loada u16_value
-    jumpm u16_ret
+include "../lib/print_fdec.m8a"
 
-print_dec:
-    storea num_value
-    seta 0
-    storea digit_ones
-    storea digit_tens
-    storea digit_hundreds
-    storea digit_thousands
-    storea digit_tenthousands
-    storea seen_digit
-    loada num_value
-    branchz print_zero
-print_dec_loop:
-    loada num_value
-    branchz print_dec_emit
-    subi 1
-    storea num_value
-    loada digit_ones
-    addi 1
-    storea digit_ones
-    cmpm ten
-    branchz carry_tens
-    jump print_dec_loop
-carry_tens:
-    seta 0
-    storea digit_ones
-    loada digit_tens
-    addi 1
-    storea digit_tens
-    cmpm ten
-    branchz carry_hundreds
-    jump print_dec_loop
-carry_hundreds:
-    seta 0
-    storea digit_tens
-    loada digit_hundreds
-    addi 1
-    storea digit_hundreds
-    cmpm ten
-    branchz carry_thousands
-    jump print_dec_loop
-carry_thousands:
-    seta 0
-    storea digit_hundreds
-    loada digit_thousands
-    addi 1
-    storea digit_thousands
-    cmpm ten
-    branchz carry_tenthousands
-    jump print_dec_loop
-carry_tenthousands:
-    seta 0
-    storea digit_thousands
-    loada digit_tenthousands
-    addi 1
-    storea digit_tenthousands
-    jump print_dec_loop
-print_zero:
-    seta 48
-    storea digit_char
-    trap write 1 digit_char 1
-    jumpm print_ret
-print_dec_emit:
-    loada digit_tenthousands
-    branchz print_10000_maybe_skip
-    seta 1
-    storea seen_digit
-    loada digit_tenthousands
-    addi 48
-    storea digit_char
-    trap write 1 digit_char 1
-    jump print_1000
-print_10000_maybe_skip:
-    loada seen_digit
-    branchz print_1000
-    loada digit_tenthousands
-    addi 48
-    storea digit_char
-    trap write 1 digit_char 1
-print_1000:
-    loada digit_thousands
-    branchz print_1000_maybe_skip
-    seta 1
-    storea seen_digit
-    loada digit_thousands
-    addi 48
-    storea digit_char
-    trap write 1 digit_char 1
-    jump print_100
-print_1000_maybe_skip:
-    loada seen_digit
-    branchz print_100
-    loada digit_thousands
-    addi 48
-    storea digit_char
-    trap write 1 digit_char 1
-print_100:
-    loada digit_hundreds
-    branchz print_100_maybe_skip
-    seta 1
-    storea seen_digit
-    loada digit_hundreds
-    addi 48
-    storea digit_char
-    trap write 1 digit_char 1
-    jump print_10
-print_100_maybe_skip:
-    loada seen_digit
-    branchz print_10
-    loada digit_hundreds
-    addi 48
-    storea digit_char
-    trap write 1 digit_char 1
-print_10:
-    loada digit_tens
-    branchz print_10_maybe_skip
-    seta 1
-    storea seen_digit
-    loada digit_tens
-    addi 48
-    storea digit_char
-    trap write 1 digit_char 1
-    jump print_1
-print_10_maybe_skip:
-    loada seen_digit
-    branchz print_1
-    loada digit_tens
-    addi 48
-    storea digit_char
-    trap write 1 digit_char 1
-print_1:
-    loada digit_ones
-    addi 48
-    storea digit_char
-    trap write 1 digit_char 1
-    jumpm print_ret
 
+usage_msg:
+    ascii "usage: mfscat NAME\n"
+usage_msg_end:
+not_found_msg:
+    ascii "mfs.stat: not found\n"
+not_found_msg_end:
+failed_msg:
+    ascii "mfs.stat: failed\n"
+failed_msg_end:
 name_label:
     ascii "name: "
 name_label_end:
@@ -335,19 +374,8 @@ offset_label_end:
 newline:
     ascii "\n"
 newline_end:
-usage_msg:
-    ascii "usage: mfs.stat NAME\n"
-usage_msg_end:
-failed_msg:
-    ascii "mfs.stat: failed\n"
-failed_msg_end:
-not_found_msg:
-    ascii "mfs.stat: not found\n"
-not_found_msg_end:
 mfs_image_path:
     cstring "/mfs/root.mfs"
-ten:
-    word 10
 path_limit:
     word 511
 arg_ret:
@@ -362,43 +390,17 @@ mfs_status:
     word 0
 mfs_ret:
     word 0
-mfs_entry_count:
-    word 0
-mfs_entry_idx:
+print_ret:
     word 0
 mfs_entry_ptr:
     word 0
 mfs_match_ret:
     word 0
-mfs_file_offset:
+stat_size:
     word 0
-mfs_file_size:
-    word 0
-u16_ptr:
-    word 0
-u16_ret:
-    word 0
-u16_value:
-    word 0
-u16_high:
-    word 0
-print_ret:
-    word 0
-num_value:
-    word 0
-seen_digit:
-    word 0
-digit_ones:
-    word 0
-digit_tens:
+stat_offset:
     word 0
 digit_hundreds:
-    word 0
-digit_thousands:
-    word 0
-digit_tenthousands:
-    word 0
-digit_char:
     word 0
 src_ptr:
     word 0
@@ -410,9 +412,9 @@ idx:
     word 0
 tmp_ch:
     word 0
-scratch_ptr:
-    word 0
 path_buf:
     zero 512
 mfs_buf:
     zero 8192
+
+include "../../src/userland/mfs-manifest.m8a"

@@ -5,29 +5,102 @@ start:
 after_load:
     loada mfs_status
     branchnz failed
-    seta mfs_buf+12
-    storea scratch_ptr
-    loadi scratch_ptr
-    storea mfs_entry_count
     seta mfs_buf+512
     storea mfs_entry_ptr
-    seta 0
-    storea mfs_entry_idx
-entry_loop:
-    loada mfs_entry_idx
-    cmpm mfs_entry_count
-    branchz done
-    seta after_name
+    seta ls_after_0
     storea mfs_name_ret
     jump mfs_copy_name
-after_name:
-    loada mfs_entry_ptr
-    addi 128
+ls_after_0:
+    seta mfs_buf+640
     storea mfs_entry_ptr
-    loada mfs_entry_idx
-    addi 1
-    storea mfs_entry_idx
-    jump entry_loop
+    seta ls_after_1
+    storea mfs_name_ret
+    jump mfs_copy_name
+ls_after_1:
+    seta mfs_buf+768
+    storea mfs_entry_ptr
+    seta ls_after_2
+    storea mfs_name_ret
+    jump mfs_copy_name
+ls_after_2:
+    seta mfs_buf+896
+    storea mfs_entry_ptr
+    seta ls_after_3
+    storea mfs_name_ret
+    jump mfs_copy_name
+ls_after_3:
+    seta mfs_buf+1024
+    storea mfs_entry_ptr
+    seta ls_after_4
+    storea mfs_name_ret
+    jump mfs_copy_name
+ls_after_4:
+    seta mfs_buf+1152
+    storea mfs_entry_ptr
+    seta ls_after_5
+    storea mfs_name_ret
+    jump mfs_copy_name
+ls_after_5:
+    seta mfs_buf+1280
+    storea mfs_entry_ptr
+    seta ls_after_6
+    storea mfs_name_ret
+    jump mfs_copy_name
+ls_after_6:
+    seta mfs_buf+1408
+    storea mfs_entry_ptr
+    seta ls_after_7
+    storea mfs_name_ret
+    jump mfs_copy_name
+ls_after_7:
+    seta mfs_buf+1536
+    storea mfs_entry_ptr
+    seta ls_after_8
+    storea mfs_name_ret
+    jump mfs_copy_name
+ls_after_8:
+    seta mfs_buf+1664
+    storea mfs_entry_ptr
+    seta ls_after_9
+    storea mfs_name_ret
+    jump mfs_copy_name
+ls_after_9:
+    seta mfs_buf+1792
+    storea mfs_entry_ptr
+    seta ls_after_10
+    storea mfs_name_ret
+    jump mfs_copy_name
+ls_after_10:
+    seta mfs_buf+1920
+    storea mfs_entry_ptr
+    seta ls_after_11
+    storea mfs_name_ret
+    jump mfs_copy_name
+ls_after_11:
+    seta mfs_buf+2048
+    storea mfs_entry_ptr
+    seta ls_after_12
+    storea mfs_name_ret
+    jump mfs_copy_name
+ls_after_12:
+    seta mfs_buf+2176
+    storea mfs_entry_ptr
+    seta ls_after_13
+    storea mfs_name_ret
+    jump mfs_copy_name
+ls_after_13:
+    seta mfs_buf+2304
+    storea mfs_entry_ptr
+    seta ls_after_14
+    storea mfs_name_ret
+    jump mfs_copy_name
+ls_after_14:
+    seta mfs_buf+2432
+    storea mfs_entry_ptr
+    seta ls_after_15
+    storea mfs_name_ret
+    jump mfs_copy_name
+ls_after_15:
 done:
     trap exit 0
 failed:
@@ -92,10 +165,6 @@ mfs_status:
     word 0
 mfs_ret:
     word 0
-mfs_entry_count:
-    word 0
-mfs_entry_idx:
-    word 0
 mfs_entry_ptr:
     word 0
 mfs_name_ret:
@@ -103,8 +172,6 @@ mfs_name_ret:
 src_ptr:
     word 0
 name_scratch:
-    word 0
-scratch_ptr:
     word 0
 mfs_buf:
     zero 8192

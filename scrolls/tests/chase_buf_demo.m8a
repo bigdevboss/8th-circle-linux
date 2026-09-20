@@ -1,0 +1,76 @@
+; chase_buf_demo: runtime proof of the C9 buffer idiom.
+; A `zero N` buffer gets its pointer-chain links restored by the unrolled
+; `rechain` macro, bytes are appended through a chasing write cursor
+; (save byte, loadi link, storei data, advance), and a second rechain
+; proves the reset works. Expected output: "OK!" twice, one per line.
+
+start:
+    rechain buf 8
+    seta buf
+    storea cur
+    seta back1
+    storea byte_ret
+    seta 79
+    jump write_byte
+back1:
+    seta back2
+    storea byte_ret
+    seta 75
+    jump write_byte
+back2:
+    seta back3
+    storea byte_ret
+    seta 33
+    jump write_byte
+back3:
+    trap write 1 buf 3
+
+    rechain buf 8
+    seta buf
+    storea cur
+    seta back4
+    storea byte_ret
+    seta 79
+    jump write_byte
+back4:
+    seta back5
+    storea byte_ret
+    seta 75
+    jump write_byte
+back5:
+    seta back6
+    storea byte_ret
+    seta 33
+    jump write_byte
+back6:
+    trap write 1 buf 3
+    trap write 1 newline newline_end-newline
+    trap exit 0
+
+write_byte:
+    storea ch
+    loada cur
+    branchz full
+    loadi cur
+    storea next
+    loada ch
+    storei cur
+    loada next
+    storea cur
+    jumpm byte_ret
+full:
+    trap exit 1
+
+newline:
+    ascii "\n"
+newline_end:
+buf:
+    zero 8
+cur:
+    word 0
+next:
+    word 0
+ch:
+    word 0
+byte_ret:
+    word 0

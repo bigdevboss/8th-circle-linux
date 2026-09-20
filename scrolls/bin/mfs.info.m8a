@@ -6,69 +6,124 @@ after_load:
     loada mfs_status
     branchnz failed
     trap write 1 title_msg title_msg_end-title_msg
-    seta mfs_buf+12
-    storea u16_ptr
-    seta after_entry_count
-    storea u16_ret
-    jump read_u16
-after_entry_count:
-    storea mfs_entry_count
     trap write 1 entries_label entries_label_end-entries_label
     seta after_print_entries
     storea print_ret
-    loada mfs_entry_count
+    loada mfs_buf+12
     jump print_dec
 after_print_entries:
     trap write 1 newline newline_end-newline
-    seta mfs_buf+24
-    storea u16_ptr
-    seta after_image_size
-    storea u16_ret
-    jump read_u16
-after_image_size:
-    storea mfs_image_size
     trap write 1 image_size_label image_size_label_end-image_size_label
     seta after_print_image_size
     storea print_ret
-    loada mfs_image_size
+    loada mfs_len
     jump print_dec
 after_print_image_size:
     trap write 1 newline newline_end-newline
-    seta mfs_buf+28
-    storea u16_ptr
-    seta after_entry_size
-    storea u16_ret
-    jump read_u16
-after_entry_size:
-    storea mfs_entry_size
     trap write 1 entry_size_label entry_size_label_end-entry_size_label
     seta after_print_entry_size
     storea print_ret
-    loada mfs_entry_size
+    loada mfs_buf+28
     jump print_dec
 after_print_entry_size:
     trap write 1 newline newline_end-newline
     trap write 1 files_label files_label_end-files_label
     seta mfs_buf+512
     storea mfs_entry_ptr
-    seta 0
-    storea mfs_entry_idx
-entry_loop:
-    loada mfs_entry_idx
-    cmpm mfs_entry_count
-    branchz done
-    seta after_name
+    seta info_after_0
     storea mfs_name_ret
     jump mfs_copy_name
-after_name:
-next_entry:
-    loada mfs_entry_ptr
-    addi 128
+info_after_0:
+    seta mfs_buf+640
     storea mfs_entry_ptr
-    loada mfs_entry_idx
-    addi 1
-    storea mfs_entry_idx
-    jump entry_loop
+    seta info_after_1
+    storea mfs_name_ret
+    jump mfs_copy_name
+info_after_1:
+    seta mfs_buf+768
+    storea mfs_entry_ptr
+    seta info_after_2
+    storea mfs_name_ret
+    jump mfs_copy_name
+info_after_2:
+    seta mfs_buf+896
+    storea mfs_entry_ptr
+    seta info_after_3
+    storea mfs_name_ret
+    jump mfs_copy_name
+info_after_3:
+    seta mfs_buf+1024
+    storea mfs_entry_ptr
+    seta info_after_4
+    storea mfs_name_ret
+    jump mfs_copy_name
+info_after_4:
+    seta mfs_buf+1152
+    storea mfs_entry_ptr
+    seta info_after_5
+    storea mfs_name_ret
+    jump mfs_copy_name
+info_after_5:
+    seta mfs_buf+1280
+    storea mfs_entry_ptr
+    seta info_after_6
+    storea mfs_name_ret
+    jump mfs_copy_name
+info_after_6:
+    seta mfs_buf+1408
+    storea mfs_entry_ptr
+    seta info_after_7
+    storea mfs_name_ret
+    jump mfs_copy_name
+info_after_7:
+    seta mfs_buf+1536
+    storea mfs_entry_ptr
+    seta info_after_8
+    storea mfs_name_ret
+    jump mfs_copy_name
+info_after_8:
+    seta mfs_buf+1664
+    storea mfs_entry_ptr
+    seta info_after_9
+    storea mfs_name_ret
+    jump mfs_copy_name
+info_after_9:
+    seta mfs_buf+1792
+    storea mfs_entry_ptr
+    seta info_after_10
+    storea mfs_name_ret
+    jump mfs_copy_name
+info_after_10:
+    seta mfs_buf+1920
+    storea mfs_entry_ptr
+    seta info_after_11
+    storea mfs_name_ret
+    jump mfs_copy_name
+info_after_11:
+    seta mfs_buf+2048
+    storea mfs_entry_ptr
+    seta info_after_12
+    storea mfs_name_ret
+    jump mfs_copy_name
+info_after_12:
+    seta mfs_buf+2176
+    storea mfs_entry_ptr
+    seta info_after_13
+    storea mfs_name_ret
+    jump mfs_copy_name
+info_after_13:
+    seta mfs_buf+2304
+    storea mfs_entry_ptr
+    seta info_after_14
+    storea mfs_name_ret
+    jump mfs_copy_name
+info_after_14:
+    seta mfs_buf+2432
+    storea mfs_entry_ptr
+    seta info_after_15
+    storea mfs_name_ret
+    jump mfs_copy_name
+info_after_15:
 done:
     trap exit 0
 failed:
@@ -117,166 +172,11 @@ mfs_copy_name_nl:
 mfs_copy_name_done:
     jumpm mfs_name_ret
 
-read_u16:
-    loadi u16_ptr
-    storea u16_value
-    loada u16_ptr
-    addi 1
-    storea scratch_ptr
-    loadi scratch_ptr
-    storea u16_high
-read_u16_loop:
-    loada u16_high
-    branchz read_u16_done
-    loada u16_value
-    addi 256
-    storea u16_value
-    loada u16_high
-    subi 1
-    storea u16_high
-    jump read_u16_loop
-read_u16_done:
-    loada u16_value
-    jumpm u16_ret
+include "../lib/print_fdec.m8a"
 
-print_dec:
-    storea num_value
-    seta 0
-    storea digit_ones
-    storea digit_tens
-    storea digit_hundreds
-    storea digit_thousands
-    storea digit_tenthousands
-    storea seen_digit
-    loada num_value
-    branchz print_zero
-print_dec_loop:
-    loada num_value
-    branchz print_dec_emit
-    subi 1
-    storea num_value
-    loada digit_ones
-    addi 1
-    storea digit_ones
-    cmpm ten
-    branchz carry_tens
-    jump print_dec_loop
-carry_tens:
-    seta 0
-    storea digit_ones
-    loada digit_tens
-    addi 1
-    storea digit_tens
-    cmpm ten
-    branchz carry_hundreds
-    jump print_dec_loop
-carry_hundreds:
-    seta 0
-    storea digit_tens
-    loada digit_hundreds
-    addi 1
-    storea digit_hundreds
-    cmpm ten
-    branchz carry_thousands
-    jump print_dec_loop
-carry_thousands:
-    seta 0
-    storea digit_hundreds
-    loada digit_thousands
-    addi 1
-    storea digit_thousands
-    cmpm ten
-    branchz carry_tenthousands
-    jump print_dec_loop
-carry_tenthousands:
-    seta 0
-    storea digit_thousands
-    loada digit_tenthousands
-    addi 1
-    storea digit_tenthousands
-    jump print_dec_loop
-print_zero:
-    seta 48
-    storea digit_char
-    trap write 1 digit_char 1
-    jumpm print_ret
-print_dec_emit:
-    loada digit_tenthousands
-    branchz print_10000_maybe_skip
-    seta 1
-    storea seen_digit
-    loada digit_tenthousands
-    addi 48
-    storea digit_char
-    trap write 1 digit_char 1
-    jump print_1000
-print_10000_maybe_skip:
-    loada seen_digit
-    branchz print_1000
-    loada digit_tenthousands
-    addi 48
-    storea digit_char
-    trap write 1 digit_char 1
-print_1000:
-    loada digit_thousands
-    branchz print_1000_maybe_skip
-    seta 1
-    storea seen_digit
-    loada digit_thousands
-    addi 48
-    storea digit_char
-    trap write 1 digit_char 1
-    jump print_100
-print_1000_maybe_skip:
-    loada seen_digit
-    branchz print_100
-    loada digit_thousands
-    addi 48
-    storea digit_char
-    trap write 1 digit_char 1
-print_100:
-    loada digit_hundreds
-    branchz print_100_maybe_skip
-    seta 1
-    storea seen_digit
-    loada digit_hundreds
-    addi 48
-    storea digit_char
-    trap write 1 digit_char 1
-    jump print_10
-print_100_maybe_skip:
-    loada seen_digit
-    branchz print_10
-    loada digit_hundreds
-    addi 48
-    storea digit_char
-    trap write 1 digit_char 1
-print_10:
-    loada digit_tens
-    branchz print_10_maybe_skip
-    seta 1
-    storea seen_digit
-    loada digit_tens
-    addi 48
-    storea digit_char
-    trap write 1 digit_char 1
-    jump print_1
-print_10_maybe_skip:
-    loada seen_digit
-    branchz print_1
-    loada digit_tens
-    addi 48
-    storea digit_char
-    trap write 1 digit_char 1
-print_1:
-    loada digit_ones
-    addi 48
-    storea digit_char
-    trap write 1 digit_char 1
-    jumpm print_ret
 
 title_msg:
-    ascii "MFS8 v0 image\n"
+    ascii "MFS8 v1 image\n"
 title_msg_end:
 entries_label:
     ascii "entries: "
@@ -298,8 +198,6 @@ failed_msg:
 failed_msg_end:
 mfs_image_path:
     cstring "/mfs/root.mfs"
-ten:
-    word 10
 mfs_fd:
     word 0
 mfs_len:
@@ -308,49 +206,17 @@ mfs_status:
     word 0
 mfs_ret:
     word 0
-mfs_entry_count:
-    word 0
-mfs_entry_size:
-    word 0
-mfs_image_size:
-    word 0
-mfs_entry_idx:
+print_ret:
     word 0
 mfs_entry_ptr:
     word 0
 mfs_name_ret:
     word 0
-u16_ptr:
-    word 0
-u16_ret:
-    word 0
-u16_value:
-    word 0
-u16_high:
-    word 0
-print_ret:
-    word 0
-num_value:
-    word 0
-seen_digit:
-    word 0
-digit_ones:
-    word 0
-digit_tens:
-    word 0
 digit_hundreds:
-    word 0
-digit_thousands:
-    word 0
-digit_tenthousands:
-    word 0
-digit_char:
     word 0
 src_ptr:
     word 0
 name_scratch:
-    word 0
-scratch_ptr:
     word 0
 mfs_buf:
     zero 8192

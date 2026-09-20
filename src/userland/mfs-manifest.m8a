@@ -1,0 +1,128 @@
+mfs_entry_0_src:
+    word mfs_buf+2560
+mfs_entry_0_end:
+    word mfs_buf+2635
+mfs_entry_0_size:
+    word 75
+mfs_entry_0_offset:
+    word 2560
+mfs_entry_1_src:
+    word mfs_buf
+mfs_entry_1_end:
+    word mfs_buf
+mfs_entry_1_size:
+    word 0
+mfs_entry_1_offset:
+    word 0
+mfs_entry_2_src:
+    word mfs_buf
+mfs_entry_2_end:
+    word mfs_buf
+mfs_entry_2_size:
+    word 0
+mfs_entry_2_offset:
+    word 0
+mfs_entry_3_src:
+    word mfs_buf
+mfs_entry_3_end:
+    word mfs_buf
+mfs_entry_3_size:
+    word 0
+mfs_entry_3_offset:
+    word 0
+mfs_entry_4_src:
+    word mfs_buf
+mfs_entry_4_end:
+    word mfs_buf
+mfs_entry_4_size:
+    word 0
+mfs_entry_4_offset:
+    word 0
+mfs_entry_5_src:
+    word mfs_buf
+mfs_entry_5_end:
+    word mfs_buf
+mfs_entry_5_size:
+    word 0
+mfs_entry_5_offset:
+    word 0
+mfs_entry_6_src:
+    word mfs_buf
+mfs_entry_6_end:
+    word mfs_buf
+mfs_entry_6_size:
+    word 0
+mfs_entry_6_offset:
+    word 0
+mfs_entry_7_src:
+    word mfs_buf
+mfs_entry_7_end:
+    word mfs_buf
+mfs_entry_7_size:
+    word 0
+mfs_entry_7_offset:
+    word 0
+mfs_entry_8_src:
+    word mfs_buf
+mfs_entry_8_end:
+    word mfs_buf
+mfs_entry_8_size:
+    word 0
+mfs_entry_8_offset:
+    word 0
+mfs_entry_9_src:
+    word mfs_buf
+mfs_entry_9_end:
+    word mfs_buf
+mfs_entry_9_size:
+    word 0
+mfs_entry_9_offset:
+    word 0
+mfs_entry_10_src:
+    word mfs_buf
+mfs_entry_10_end:
+    word mfs_buf
+mfs_entry_10_size:
+    word 0
+mfs_entry_10_offset:
+    word 0
+mfs_entry_11_src:
+    word mfs_buf
+mfs_entry_11_end:
+    word mfs_buf
+mfs_entry_11_size:
+    word 0
+mfs_entry_11_offset:
+    word 0
+mfs_entry_12_src:
+    word mfs_buf
+mfs_entry_12_end:
+    word mfs_buf
+mfs_entry_12_size:
+    word 0
+mfs_entry_12_offset:
+    word 0
+mfs_entry_13_src:
+    word mfs_buf
+mfs_entry_13_end:
+    word mfs_buf
+mfs_entry_13_size:
+    word 0
+mfs_entry_13_offset:
+    word 0
+mfs_entry_14_src:
+    word mfs_buf
+mfs_entry_14_end:
+    word mfs_buf
+mfs_entry_14_size:
+    word 0
+mfs_entry_14_offset:
+    word 0
+mfs_entry_15_src:
+    word mfs_buf
+mfs_entry_15_end:
+    word mfs_buf
+mfs_entry_15_size:
+    word 0
+mfs_entry_15_offset:
+    word 0

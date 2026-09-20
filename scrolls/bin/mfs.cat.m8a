@@ -10,67 +10,243 @@ after_arg:
 after_load:
     loada mfs_status
     branchnz failed
-    seta mfs_buf+12
-    storea scratch_ptr
-    loadi scratch_ptr
-    storea mfs_entry_count
+cat_try_0:
     seta mfs_buf+512
     storea mfs_entry_ptr
-    seta 0
-    storea mfs_entry_idx
-find_loop:
-    loada mfs_entry_idx
-    cmpm mfs_entry_count
-    branchz failed
-    seta after_match
+    seta cat_after_0
     storea mfs_match_ret
     jump mfs_name_matches_path
-after_match:
-    branchnz found
-    loada mfs_entry_ptr
-    addi 128
+cat_after_0:
+    branchnz cat_found_0
+cat_try_1:
+    seta mfs_buf+640
     storea mfs_entry_ptr
-    loada mfs_entry_idx
-    addi 1
-    storea mfs_entry_idx
-    jump find_loop
-found:
-    loada mfs_entry_ptr
-    addi 96
-    storea u16_ptr
-    seta after_offset
-    storea u16_ret
-    jump read_u16
-after_offset:
-    storea mfs_file_offset
-    loada mfs_entry_ptr
-    addi 100
-    storea u16_ptr
-    seta after_size
-    storea u16_ret
-    jump read_u16
-after_size:
-    storea mfs_file_size
-    seta mfs_buf
-    addm mfs_file_offset
+    seta cat_after_1
+    storea mfs_match_ret
+    jump mfs_name_matches_path
+cat_after_1:
+    branchnz cat_found_1
+cat_try_2:
+    seta mfs_buf+768
+    storea mfs_entry_ptr
+    seta cat_after_2
+    storea mfs_match_ret
+    jump mfs_name_matches_path
+cat_after_2:
+    branchnz cat_found_2
+cat_try_3:
+    seta mfs_buf+896
+    storea mfs_entry_ptr
+    seta cat_after_3
+    storea mfs_match_ret
+    jump mfs_name_matches_path
+cat_after_3:
+    branchnz cat_found_3
+cat_try_4:
+    seta mfs_buf+1024
+    storea mfs_entry_ptr
+    seta cat_after_4
+    storea mfs_match_ret
+    jump mfs_name_matches_path
+cat_after_4:
+    branchnz cat_found_4
+cat_try_5:
+    seta mfs_buf+1152
+    storea mfs_entry_ptr
+    seta cat_after_5
+    storea mfs_match_ret
+    jump mfs_name_matches_path
+cat_after_5:
+    branchnz cat_found_5
+cat_try_6:
+    seta mfs_buf+1280
+    storea mfs_entry_ptr
+    seta cat_after_6
+    storea mfs_match_ret
+    jump mfs_name_matches_path
+cat_after_6:
+    branchnz cat_found_6
+cat_try_7:
+    seta mfs_buf+1408
+    storea mfs_entry_ptr
+    seta cat_after_7
+    storea mfs_match_ret
+    jump mfs_name_matches_path
+cat_after_7:
+    branchnz cat_found_7
+cat_try_8:
+    seta mfs_buf+1536
+    storea mfs_entry_ptr
+    seta cat_after_8
+    storea mfs_match_ret
+    jump mfs_name_matches_path
+cat_after_8:
+    branchnz cat_found_8
+cat_try_9:
+    seta mfs_buf+1664
+    storea mfs_entry_ptr
+    seta cat_after_9
+    storea mfs_match_ret
+    jump mfs_name_matches_path
+cat_after_9:
+    branchnz cat_found_9
+cat_try_10:
+    seta mfs_buf+1792
+    storea mfs_entry_ptr
+    seta cat_after_10
+    storea mfs_match_ret
+    jump mfs_name_matches_path
+cat_after_10:
+    branchnz cat_found_10
+cat_try_11:
+    seta mfs_buf+1920
+    storea mfs_entry_ptr
+    seta cat_after_11
+    storea mfs_match_ret
+    jump mfs_name_matches_path
+cat_after_11:
+    branchnz cat_found_11
+cat_try_12:
+    seta mfs_buf+2048
+    storea mfs_entry_ptr
+    seta cat_after_12
+    storea mfs_match_ret
+    jump mfs_name_matches_path
+cat_after_12:
+    branchnz cat_found_12
+cat_try_13:
+    seta mfs_buf+2176
+    storea mfs_entry_ptr
+    seta cat_after_13
+    storea mfs_match_ret
+    jump mfs_name_matches_path
+cat_after_13:
+    branchnz cat_found_13
+cat_try_14:
+    seta mfs_buf+2304
+    storea mfs_entry_ptr
+    seta cat_after_14
+    storea mfs_match_ret
+    jump mfs_name_matches_path
+cat_after_14:
+    branchnz cat_found_14
+cat_try_15:
+    seta mfs_buf+2432
+    storea mfs_entry_ptr
+    seta cat_after_15
+    storea mfs_match_ret
+    jump mfs_name_matches_path
+cat_after_15:
+    branchnz cat_found_15
+    jump failed
+cat_found_0:
+    loada mfs_entry_0_src
     storea src_ptr
-    seta 0
-    storea idx
-copy_payload_loop:
-    loada idx
-    cmpm mfs_file_size
-    branchz copy_payload_done
+    loada mfs_entry_0_end
+    storea payload_end
+    jump cat_print_payload
+cat_found_1:
+    loada mfs_entry_1_src
+    storea src_ptr
+    loada mfs_entry_1_end
+    storea payload_end
+    jump cat_print_payload
+cat_found_2:
+    loada mfs_entry_2_src
+    storea src_ptr
+    loada mfs_entry_2_end
+    storea payload_end
+    jump cat_print_payload
+cat_found_3:
+    loada mfs_entry_3_src
+    storea src_ptr
+    loada mfs_entry_3_end
+    storea payload_end
+    jump cat_print_payload
+cat_found_4:
+    loada mfs_entry_4_src
+    storea src_ptr
+    loada mfs_entry_4_end
+    storea payload_end
+    jump cat_print_payload
+cat_found_5:
+    loada mfs_entry_5_src
+    storea src_ptr
+    loada mfs_entry_5_end
+    storea payload_end
+    jump cat_print_payload
+cat_found_6:
+    loada mfs_entry_6_src
+    storea src_ptr
+    loada mfs_entry_6_end
+    storea payload_end
+    jump cat_print_payload
+cat_found_7:
+    loada mfs_entry_7_src
+    storea src_ptr
+    loada mfs_entry_7_end
+    storea payload_end
+    jump cat_print_payload
+cat_found_8:
+    loada mfs_entry_8_src
+    storea src_ptr
+    loada mfs_entry_8_end
+    storea payload_end
+    jump cat_print_payload
+cat_found_9:
+    loada mfs_entry_9_src
+    storea src_ptr
+    loada mfs_entry_9_end
+    storea payload_end
+    jump cat_print_payload
+cat_found_10:
+    loada mfs_entry_10_src
+    storea src_ptr
+    loada mfs_entry_10_end
+    storea payload_end
+    jump cat_print_payload
+cat_found_11:
+    loada mfs_entry_11_src
+    storea src_ptr
+    loada mfs_entry_11_end
+    storea payload_end
+    jump cat_print_payload
+cat_found_12:
+    loada mfs_entry_12_src
+    storea src_ptr
+    loada mfs_entry_12_end
+    storea payload_end
+    jump cat_print_payload
+cat_found_13:
+    loada mfs_entry_13_src
+    storea src_ptr
+    loada mfs_entry_13_end
+    storea payload_end
+    jump cat_print_payload
+cat_found_14:
+    loada mfs_entry_14_src
+    storea src_ptr
+    loada mfs_entry_14_end
+    storea payload_end
+    jump cat_print_payload
+cat_found_15:
+    loada mfs_entry_15_src
+    storea src_ptr
+    loada mfs_entry_15_end
+    storea payload_end
+    jump cat_print_payload
+cat_print_payload:
+    loada src_ptr
+    cmpm payload_end
+    branchz cat_payload_done
     loadi src_ptr
     storea out_byte
     trap write 1 out_byte 1
     loada src_ptr
     addi 1
     storea src_ptr
-    loada idx
-    addi 1
-    storea idx
-    jump copy_payload_loop
-copy_payload_done:
+    jump cat_print_payload
+cat_payload_done:
     trap exit 0
 usage:
     trap write 2 usage_msg usage_msg_end-usage_msg
@@ -160,28 +336,6 @@ match_success:
     seta 1
     jumpm mfs_match_ret
 
-read_u16:
-    loadi u16_ptr
-    storea u16_value
-    loada u16_ptr
-    addi 1
-    storea scratch_ptr
-    loadi scratch_ptr
-    storea u16_high
-read_u16_loop:
-    loada u16_high
-    branchz read_u16_done
-    loada u16_value
-    addi 256
-    storea u16_value
-    loada u16_high
-    subi 1
-    storea u16_high
-    jump read_u16_loop
-read_u16_done:
-    loada u16_value
-    jumpm u16_ret
-
 usage_msg:
     ascii "usage: mfscat NAME\n"
 usage_msg_end:
@@ -202,25 +356,9 @@ mfs_status:
     word 0
 mfs_ret:
     word 0
-mfs_entry_count:
-    word 0
-mfs_entry_idx:
-    word 0
 mfs_entry_ptr:
     word 0
 mfs_match_ret:
-    word 0
-mfs_file_offset:
-    word 0
-mfs_file_size:
-    word 0
-u16_ptr:
-    word 0
-u16_ret:
-    word 0
-u16_value:
-    word 0
-u16_high:
     word 0
 src_ptr:
     word 0
@@ -228,15 +366,15 @@ pat_ptr:
     word 0
 dst_ptr:
     word 0
-idx:
-    word 0
 tmp_ch:
     word 0
 out_byte:
     word 0
-scratch_ptr:
+payload_end:
     word 0
 path_buf:
     zero 512
 mfs_buf:
     zero 8192
+
+include "../../src/userland/mfs-manifest.m8a"

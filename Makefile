@@ -30,27 +30,33 @@ BIN_IMAGES := $(patsubst $(SCROLLS)/bin/%.m8a,$(RAW)/%.mb,$(BIN_SRCS))
 MFS_ROOT = src/mfs/root
 MFS_SRC_FILES := $(shell find $(MFS_ROOT) -type f 2>/dev/null)
 MFS_IMG = $(RAW)/root.mfs
+MFS_MANIFEST = $(RAW)/mfs-manifest.m8a
 MB_IMAGES = $(INIT_IMG) $(MSH_IMG) $(BIN_IMAGES)
 RAW_IMAGES = $(MB_IMAGES) $(MFS_IMG)
 
 TESTS = scrolls/tests
+LIB_PRINTFDEC = scrolls/lib/print_fdec.m8a
 TEST_DEMO_SRC = $(TESTS)/crazy_inc_demo.m8a
 TEST_MACRO_SRC = $(TESTS)/crazy_inc_macro.m8a
 TEST_MID_SRC = $(TESTS)/crazy_inc_mid.m8a
 TEST_CELL_SRC = $(TESTS)/crazy_cell_demo.m8a
 TEST_CHASE_SRC = $(TESTS)/chase_demo.m8a
+TEST_CHASE_BUF_SRC = $(TESTS)/chase_buf_demo.m8a
+TEST_PFDEC_SRC = $(TESTS)/print_fdec_demo.m8a
 TEST_DEMO_IMG = build/tests/crazy_inc_demo.mb
 TEST_MACRO_IMG = build/tests/crazy_inc_macro.mb
 TEST_MID_IMG = build/tests/crazy_inc_mid.mb
 TEST_CELL_IMG = build/tests/crazy_cell_demo.mb
 TEST_CHASE_IMG = build/tests/chase_demo.mb
+TEST_CHASE_BUF_IMG = build/tests/chase_buf_demo.mb
+TEST_PFDEC_IMG = build/tests/print_fdec_demo.mb
 
 ROOTFS = build/rootfs
 ROOTFS_STAMP = $(ROOTFS)/.stamp
 INITRAMFS = build/8th-circle-initramfs.cpio.gz
 DIST = build/distro
 
-.PHONY: all raw mfs glyph-audit loader-tests arithmetic-audit arithmetic-audit-details arithmetic-audit-budget crazy-lab crazy-word-lab crazy-planner-lab crazy-route-lab crazy-entry-lab crazy-ritual-test msh-demo init-demo init-trace trace clean distclean check glyphs rootfs initramfs distro qemu qemu-smoke tree
+.PHONY: all raw mfs glyph-audit loader-tests arithmetic-audit arithmetic-audit-details arithmetic-audit-budget crazy-lab crazy-word-lab crazy-planner-lab crazy-route-lab crazy-entry-lab crazy-ritual-test chase-buf-test print-fdec-test msh-demo init-demo init-trace trace clean distclean check glyphs rootfs initramfs distro qemu qemu-smoke tree
 
 all: $(RUNTIME) raw
 
@@ -71,7 +77,7 @@ arithmetic-audit-details: $(ARITH_AUDIT)
 	python3 $(ARITH_AUDIT) --details $(SCROLLS)
 
 arithmetic-audit-budget: $(ARITH_AUDIT)
-	python3 $(ARITH_AUDIT) --fail-above 133 $(SCROLLS)
+	python3 $(ARITH_AUDIT) --fail-above 35 $(SCROLLS)
 
 crazy-lab: $(CRAZY)
 	python3 $(CRAZY) table
@@ -121,6 +127,14 @@ $(TEST_CHASE_IMG): $(TEST_CHASE_SRC) $(ASM) | build
 	mkdir -p build/tests
 	python3 $(ASM) $< -o $@
 
+$(TEST_CHASE_BUF_IMG): $(TEST_CHASE_BUF_SRC) $(ASM) | build
+	mkdir -p build/tests
+	python3 $(ASM) $< -o $@
+
+$(TEST_PFDEC_IMG): $(TEST_PFDEC_SRC) $(LIB_PRINTFDEC) $(ASM) | build
+	mkdir -p build/tests
+	python3 $(ASM) $< -o $@
+
 chase-test: $(RUNTIME) $(TEST_CHASE_IMG) $(AUDIT)
 	python3 $(AUDIT) $(TEST_CHASE_IMG)
 	@out=`$(RUNTIME) $(TEST_CHASE_IMG)` || exit 1; \
@@ -128,6 +142,23 @@ chase-test: $(RUNTIME) $(TEST_CHASE_IMG) $(AUDIT)
 		echo "chase demo output mismatch: $$out"; exit 1; \
 	fi; \
 	echo "chase test passed: $$out"
+
+print-fdec-test: $(RUNTIME) $(TEST_PFDEC_IMG) $(AUDIT)
+	python3 $(AUDIT) $(TEST_PFDEC_IMG)
+	@out=`$(RUNTIME) $(TEST_PFDEC_IMG)` || exit 1; \
+	want="0 1 9 10 99 100 777 999 1000 1023 2635 4096 8191 8192 75 2560 5 50"; \
+	if [ "$$out" != "$$(echo $$want | tr ' ' '\n')" ]; then \
+		echo "print_fdec output mismatch: $$out"; exit 1; \
+	fi; \
+	echo "print_fdec test passed"
+
+chase-buf-test: $(RUNTIME) $(TEST_CHASE_BUF_IMG) $(AUDIT)
+	python3 $(AUDIT) $(TEST_CHASE_BUF_IMG)
+	@out=`$(RUNTIME) $(TEST_CHASE_BUF_IMG)` || exit 1; \
+	if [ "$$out" != "OK!OK!" ]; then \
+		echo "chase buffer demo output mismatch: $$out"; exit 1; \
+	fi; \
+	echo "chase buffer test passed: $$out"
 
 crazy-ritual-test: $(RUNTIME) $(TEST_DEMO_IMG) $(TEST_MACRO_IMG) $(TEST_MID_IMG) $(TEST_CELL_IMG) $(AUDIT)
 	python3 $(AUDIT) $(TEST_DEMO_IMG) $(TEST_MACRO_IMG) $(TEST_MID_IMG) $(TEST_CELL_IMG)
@@ -159,14 +190,26 @@ $(MSH_IMG): $(MSH_SRC) $(ASM) | $(RAW)
 $(RAW)/%.mb: $(SCROLLS)/bin/%.m8a $(ASM) | $(RAW)
 	python3 $(ASM) $< -o $@ --dump-labels
 
-$(MFS_IMG): $(MFS_BUILDER) $(MFS_SRC_FILES) | $(RAW)
-	python3 $(MFS_BUILDER) $(MFS_ROOT) -o $@
+$(MFS_IMG) $(MFS_MANIFEST) &: $(MFS_BUILDER) $(MFS_SRC_FILES) | $(RAW)
+	python3 $(MFS_BUILDER) $(MFS_ROOT) -o $@ --manifest $(MFS_MANIFEST)
+
+$(RAW)/mfs.cat.mb $(RAW)/mfs.stat.mb: $(MFS_MANIFEST)
+$(RAW)/mfs.info.mb $(RAW)/mfs.stat.mb: $(LIB_PRINTFDEC)
 
 $(INIT_DEMO_IMG): $(INIT_DEMO_SRC) $(ASM) | build
 	python3 $(ASM) $< -o $@ --dump-labels
 
 msh-demo: $(RUNTIME) $(MSH_IMG)
-	printf 'help\ncd src\ncd /\nwat\nexit\n' | $(RUNTIME) $(MSH_IMG)
+	@if [ ! -d /.m8/eq ]; then \
+		sudo -n python3 tools/mkoracle.py / 2>/dev/null || \
+		echo "[8CL:msh-demo] note: run 'sudo python3 tools/mkoracle.py /' once for host msh tests"; \
+	fi
+	@out=`printf 'help\ncd src\ncd /\nwat\nexit\n' | $(RUNTIME) $(MSH_IMG)` || exit 1; \
+	echo "$$out"; \
+	if ! echo "$$out" | grep -q "8th Circle Linux msh builtins"; then \
+		echo "msh demo missing help banner; is the /.m8 oracle tree present?"; exit 1; \
+	fi; \
+	echo "msh demo passed"
 
 init-demo: $(RUNTIME) $(INIT_DEMO_IMG)
 	$(RUNTIME) $(INIT_DEMO_IMG)
@@ -209,7 +252,7 @@ qemu-smoke: initramfs $(QEMU_SMOKE)
 tree:
 	find . -maxdepth 4 -type f | sort
 
-check: raw glyph-audit loader-tests msh-demo init-demo crazy-ritual-test chase-test initramfs
+check: raw glyph-audit loader-tests msh-demo init-demo crazy-ritual-test chase-test chase-buf-test print-fdec-test initramfs
 	@echo "ok"
 
 clean:

@@ -1,0 +1,117 @@
+; print_fdec test: boundary values, each followed by a newline.
+start:
+    seta t0
+    storea print_ret
+    seta 0
+    jump print_dec
+t0:
+    trap write 1 nl nl_end-nl
+    seta t1
+    storea print_ret
+    seta 1
+    jump print_dec
+t1:
+    trap write 1 nl nl_end-nl
+    seta t2
+    storea print_ret
+    seta 9
+    jump print_dec
+t2:
+    trap write 1 nl nl_end-nl
+    seta t3
+    storea print_ret
+    seta 10
+    jump print_dec
+t3:
+    trap write 1 nl nl_end-nl
+    seta t4
+    storea print_ret
+    seta 99
+    jump print_dec
+t4:
+    trap write 1 nl nl_end-nl
+    seta t5
+    storea print_ret
+    seta 100
+    jump print_dec
+t5:
+    trap write 1 nl nl_end-nl
+    seta t6
+    storea print_ret
+    seta 777
+    jump print_dec
+t6:
+    trap write 1 nl nl_end-nl
+    seta t7
+    storea print_ret
+    seta 999
+    jump print_dec
+t7:
+    trap write 1 nl nl_end-nl
+    seta t8
+    storea print_ret
+    seta 1000
+    jump print_dec
+t8:
+    trap write 1 nl nl_end-nl
+    seta t9
+    storea print_ret
+    seta 1023
+    jump print_dec
+t9:
+    trap write 1 nl nl_end-nl
+    seta t10
+    storea print_ret
+    seta 2635
+    jump print_dec
+t10:
+    trap write 1 nl nl_end-nl
+    seta t11
+    storea print_ret
+    seta 4096
+    jump print_dec
+t11:
+    trap write 1 nl nl_end-nl
+    seta t12
+    storea print_ret
+    seta 8191
+    jump print_dec
+t12:
+    trap write 1 nl nl_end-nl
+    seta t13
+    storea print_ret
+    seta 8192
+    jump print_dec
+t13:
+    trap write 1 nl nl_end-nl
+    seta t14
+    storea print_ret
+    seta 75
+    jump print_dec
+t14:
+    trap write 1 nl nl_end-nl
+    seta t15
+    storea print_ret
+    seta 2560
+    jump print_dec
+t15:
+    trap write 1 nl nl_end-nl
+    seta t16
+    storea print_ret
+    seta 5
+    jump print_dec
+t16:
+    trap write 1 nl nl_end-nl
+    seta t17
+    storea print_ret
+    seta 50
+    jump print_dec
+t17:
+    trap write 1 nl nl_end-nl
+    trap exit 0
+include "../lib/print_fdec.m8a"
+nl:
+    ascii "\n"
+nl_end:
+print_ret:
+    word 0

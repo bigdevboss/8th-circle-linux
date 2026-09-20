@@ -235,14 +235,42 @@ The current `msh.mb` path does not use shell-specific C helper traps. Input is r
 
 Friendly aliases map `mfsls` to `/bin/mfs.ls.mb` and `mfscat` to `/bin/mfs.cat.mb`.
 
-`echo.mb` and `ls.mb` loop over the runtime argv ABI in M8. `cat.mb` walks the same argv vector through unrolled slot probes, which costs more source cells but no friendly arithmetic helpers. `ls.mb` calls the Linux `getdents64` bridge and parses `linux_dirent64` records in M8. MFS commands read `/mfs/root.mfs` and parse the MFS v0 header/table in M8:
+`echo.mb` and `ls.mb` loop over the runtime argv ABI in M8. `cat.mb` walks the same argv vector through unrolled slot probes, which costs more source cells but no friendly arithmetic helpers. `ls.mb` calls the Linux `getdents64` bridge and parses `linux_dirent64` records in M8. MFS commands read `/mfs/root.mfs` and parse the MFS v1 header and static slot table in M8:
 
 - `mfs.ls.mb` lists entry names.
 - `mfs.cat.mb NAME` copies payload bytes from the image buffer.
 - `mfs.info.mb` prints entry count, image size, entry size, and file names.
 - `mfs.stat.mb NAME` prints name, size, and payload offset.
 
-The M8 readers currently consume low 16-bit little-endian fields, which is enough for the tiny 8192-byte bootstrap image buffer. Larger MFS work should grow proper multiword integer handling instead of pretending this is enough forever.
+Numeric output goes through the file-size ALU below. `mfs.info` prints the entry count and entry size from single image bytes, and the image size comes from `mfs_len`, the byte count the initial image read returned: the honest measured file size, not a header decode. The other MFS tools take payload bounds from the generated manifest words, so no generic multiword integer handling is needed.
+
+## File-size ALU
+
+`scrolls/lib/print_fdec.m8a` prints decimal numbers with no friendly arithmetic helpers, using the kernel as the ALU. It is included by `mfs.info.m8a` and `mfs.stat.m8a` and is a drop-in replacement for their old counter-based `print_dec`: the value arrives in A (bounded by the 8192-cell scratch region), the caller stores a return target into `print_ret`, and the failure path jumps back silently.
+
+The value becomes a file size with one bounded write: `open("/tmp/8cl-dec-a", O_WRONLY|O_CREAT|O_TRUNC, 0700)`, `dup2` to static fd 7, close the original fd, then `trap write 7 dec_scr A` creates a file of exactly A bytes. The written content is scratch garbage and is never read back; only the size matters.
+
+Each decimal position p (1000, 100, 10, 1) is an ascending ladder on that single fd:
+
+- `read(fd, dec_scr, p-1)` then `read(fd, dec_scr, 1)` proves at least p bytes remained, and each successful rung consumed exactly p bytes because the read offset advances.
+- The first failing rung means the digit is the previous rung; if all nine rungs pass, the digit is 9.
+- The kernel return count in A is the comparator: `branchz` on the second read.
+
+The remainder after digit d at position p is carried to the next position by copying the unconsumed bytes: reopen the source, `read(fd, dec_scr, d*p)` skips the consumed prefix with a static length, `read(fd, dec_scr, 8192)` measures the rest into A, then the second scratch file `/tmp/8cl-dec-b` (static fd 8) is truncated and written with A bytes. The two files alternate as source and destination across positions. Position 1 needs no carry.
+
+Leading zeros are suppressed by a `dec_leadz` flag: a nonzero digit clears it and prints, a zero digit prints only if the flag is already clear, and if the flag survives to the end the whole value was zero and a single `0` is printed.
+
+The runtime needs `/tmp` to exist and be writable; `tools/build_rootfs.py` creates it with mode 1777. Values above 8191 are outside the contract.
+
+## Blessed OS glue
+
+The friendly arithmetic that remains after C11 is declared blessed: it implements kernel ABI shapes and runtime-data comparisons, not arithmetic we chose to keep.
+
+- `ls.m8a` (17): walks variable-length `linux_dirent64` records whose `d_reclen` is runtime kernel data, so record stepping and end detection compare and step on kernel-fed words.
+- `mfs.cat.m8a` (8) and `mfs.stat.m8a` (7): byte equality on runtime pairs, argument copies, and manifest-driven walks over data loaded at runtime.
+- `mfs.info.m8a` (1), `mfs.ls.m8a` (1), `echo.m8a` (1): one cursor step each.
+
+Total: 35, guarded by `make arithmetic-audit-budget`.
 
 ## Crazy-op groundwork
 
@@ -276,6 +304,34 @@ C6 lowered the measured total from `180` to `150` with three idioms that are lay
 C7 added four more layout idioms, all proven in `msh.m8a` and `mfs.cat.m8a`. Write cursors replace index arithmetic: instead of `seta buf` plus `addm idx` per byte, a cursor cell starts at `seta buf` and advances with `addi 1` after each store. End-pointer words replace limit counters: `line_end`, `cmd_end`, and `arg_end` are static words such as `word line_buf+256`, and the loop compares the cursor against the end cell with one `cmpm`. NUL-bound compares replace counted string equality: `cmd_eq` walks both strings until they disagree or both hit zero, so compare lengths and index counters are gone. Sentinel-terminated pointer tables replace counted vector copies: `arg_ptrs` always holds a `0` slot one past the last argument, so `build_exec_argv` copies with `loadi`/`storei` until it loads the sentinel. `read_line` drops CR and LF at read time, which deleted the trim routine entirely.
 
 The same pass produced the pointer-chase idiom in `scrolls/tests/chase_demo.m8a`. A chain of cells where each cell holds the absolute address of the next one advances with `loadi cur` plus `storea cur` and terminates on a stored `0`, with no arithmetic at all. The payload is the address itself: nodes sit at addresses whose low byte is the character to print, because `trap write` emits `mem[cell] & 0xff`. The demo nodes live at `591` (`O`), `587` (`K`), and `545` (`!`), reached with `zero` padding computed from the assembler label dump. `make chase-test` runs it and expects `OK!`. This is the template for linked structures in later MFS work: a manifest of pointer words turns table walks into pure chases.
+
+C8 defined MFS v1 and put the layout idioms into the real MFS tools. The v1 format keeps the 512-byte header and 128-byte entries, but the entry table is a fixed 16 slots, zero-filled, and payloads always start at byte 2560. The header magic is `MFS8V1`. The slot count is a build-time constant shared by `tools/mkmfs.py` and the tool scrolls; `mkmfs.py` refuses more than 16 files. Because unused slots are zero, an empty name is the walk terminator: `mfs.ls` and `mfs.info` run 16 unrolled static slot blocks (`seta mfs_buf+512`, `seta mfs_buf+640`, and so on), and `mfs.cat` and `mfs.stat` run 16 unrolled matcher blocks that branch to a per-slot found handler when the name matches.
+
+`tools/mkmfs.py --manifest PATH` also emits the manifest, a generated assembly fragment defining four words per slot: `mfs_entry_k_src` (payload source as `word mfs_buf+offset`), `mfs_entry_k_end` (payload end), `mfs_entry_k_size`, and `mfs_entry_k_offset`. The words reference the including scroll's own `mfs_buf` label, so one manifest serves every tool. `mfs.cat.m8a` and `mfs.stat.m8a` pull it in through the new `include "../../src/userland/mfs-manifest.m8a"` directive, and their found handlers load the slot words into shared cells before jumping to one payload or metadata routine. The result: entry walks, field offsets, and size decoding no longer need runtime arithmetic at all. The manifest is part of the MFS distribution, like a DTB beside a kernel image: payload bytes, entry names, and the header still come from the real image read at runtime, and `mfs.info` deliberately decodes its numbers from the image instead of the manifest.
+
+C9 put the chase-buffer idiom into the shell. A `zero N` buffer becomes a pointer chain at runtime: the unrolled `rechain` macro stores the address of cell k+1 into cell k (last cell gets 0), and a write cursor advances by chasing: save the link with `loadi cur; storea next`, store the byte with `storei cur`, then advance with `loada next; storea cur`. Six instructions per byte, zero arithmetic. `scrolls/tests/chase_buf_demo.m8a` proves the idiom and the reset in one image.
+
+`msh` is built entirely on this. Reading and parsing are fused into a single pass with three read loops that double as parser states (between words, inside the command word, inside an argument word); the code location is the state. Spaces NUL-terminate arguments in place. The command name is double-written into a name chain (for builtin compares and messages) and into a static `/bin/` path region; `.mb\0` is appended to the path only when an external command is dispatched. The exec argv slot region is itself an 8-cell chain: each argument start stores its pointer into the next slot via the same chase-write, and at line end the first unfilled slot is zeroed as the `execve` terminator. The argument buffer chain self-advances across lines (arguments stay valid where they lie) and is rechained only when exhausted; when an argument overflows, its argv slot is cleared, the argument is dropped, and a drain loop consumes input until LF so the next prompt starts on a clean boundary.
+
+C10 answered the classifier question with a research result and a shipping mechanism.
+
+The research result: classic crazy ops cannot live in parser loops. The VM data pointer D advances one cell per executed instruction, exactly like classic Malbolge, so D is a deterministic function of the instruction count since startup. Any code that runs after a variable number of instructions, such as a read loop or a parser, reaches its classic ops with an unpredictable D, and every classic op touches `mem[D]`: `j` sets D from it, `i` sets C from it, `*` rotates it, `p` crazies A with it and writes the result back. The `crazyinc` rituals dodge this by running straight-line from program start, where the planner knows the exact instruction count. A D-synchronization primitive would need instruction counting, which is the very arithmetic being eliminated. So classic ops stay confined to planned straight-line rituals.
+
+The shipping mechanism is the filesystem equality oracle. `msh` classifies each input byte and compares builtin-name characters with `open(2)`: a path built from the byte opens successfully only when a matching magic file exists. The tree is precomputed data in the rootfs (built by `tools/mkoracle.py`, imported by `tools/build_rootfs.py`):
+
+```text
+/.m8/x/
+x  /.m8/x/
+x  /.m8/x/ x    hot separator test
+/.m8/n/
+x                               LF oracle
+/.m8/r/
+x                               CR oracle
+/.m8/s/ x                                space oracle
+/.m8/eq/<C>/<C>e   for each builtin pattern character C
+```
+
+Each read loop drops the input byte into a fixed path cell via one `storei` through a pointer word, probes `/.m8/x/<byte>x`, and on success distinguishes LF and CR with the `/.m8/n` and `/.m8/r` probes; whatever remains is a space. The trailing `x` suffix defeats path collapse for `/` and `.` bytes, NUL is pre-checked with `branchz` before any probe, and every successful probe fd is closed. Builtin dispatch unrolls per character: pattern and name bytes go into the `/.m8/eq/<pattern>/<name>e` path with two `storea` writes at fixed labels, and the final NUL position is a plain `branchz`. `unknown_command` prints the name with unrolled per-cell `trap write` calls that stop at the first NUL, so `cmd_len` and its `subm` are gone; the empty-line check uses a `cmd_started` flag. With that, `msh.m8a` contains zero friendly arithmetic helper lines, and the hot path costs one `open` per input byte, which is microseconds on a ramfs.
 
 Current C5 tools:
 
@@ -374,6 +430,8 @@ Supported data helpers:
 - `ptr label` emits one or more VM pointer words.
 - `ptrv a b c` emits a NULL-terminated pointer vector.
 - `zero N` reserves N cells as printable filler. It is for buffers that later get overwritten by syscalls or M8 copy code.
+- `include "path"` splices another source file into the current one before parsing. Paths resolve relative to the including file first, then the working directory; include cycles are rejected. It exists for generated fragments such as the MFS manifest.
+- `rechain LABEL COUNT` is a codegen macro: it expands at assemble time into unrolled `seta LABEL+k+1; storea LABEL+k` pairs (the last cell gets `seta 0`), which restore a pointer chain inside a `zero COUNT` buffer at runtime. Buffers used with chasing write cursors cost no initialized data cells and no friendly arithmetic.
 - `crazyinc N` is a codegen macro, not data: it expands at assemble time into a planned classic-op ritual that rewrites a cell from N to N+1, proves the result, prints `OK`, and halts. See the C5.6-C5.8 notes above for the contract.
 - `crazyinc-cell ADDR VALUE` is the live-cell codegen macro: it expands into a planned ritual that rewrites the cell at `ADDR`, a label or expression, from `VALUE` to `VALUE+1`, landing D on the live cell with a classic `j` hop. See the C6.1 notes above for the contract.
 
@@ -400,7 +458,9 @@ Human-readable source scrolls live in `scrolls/`. Generated printable userland l
 scrolls/init.m8a      -> src/userland/init.mb      printable M8 glyph program
 scrolls/msh.m8a       -> src/userland/msh.mb       printable M8 glyph program
 scrolls/bin/*.m8a     -> src/userland/*.mb         printable M8 glyph programs
-src/mfs/root/             -> src/userland/root.mfs     MFS v0 image
+scrolls/lib/print_fdec.m8a -> included by mfs.info.m8a and mfs.stat.m8a
+src/mfs/root/             -> src/userland/root.mfs     MFS v1 image
+src/mfs/root/             -> src/userland/mfs-manifest.m8a  generated per-slot manifest
 ```
 
 

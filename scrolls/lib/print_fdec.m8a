@@ -1,0 +1,1046 @@
+; print_fdec: decimal printing with the kernel as the ALU.
+;
+; Contract: value arrives in A (0..8192), caller stored the return
+; target in print_ret. Drop-in replacement for the old counter-based
+; print_dec, with zero friendly arithmetic.
+;
+; The value becomes a file size with one bounded write (write len = A).
+; Each digit position is an ascending cumulative ladder on one fd:
+; read(p-1) then read(1) proves at least p bytes remain, and each
+; successful rung consumed exactly p bytes. The first failing rung
+; means the digit is the previous rung. The remainder is carried to
+; the next position by copying the unconsumed bytes into the second
+; scratch file. dup2 pins each open fd to a static number; the
+; original fd is saved, dup2'd, and closed. Leading zeros are
+; suppressed with a flag; a value of zero prints "0" at the end.
+print_dec:
+    storea dec_val
+    seta 1
+    storea dec_leadz
+    trap open dec_a_path 577 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 7
+    loada pfd_fd
+    trap close A
+    loada dec_val
+    trap write 7 dec_scr A
+    trap close 7
+
+pfd_p1000:
+    trap open dec_a_path 0 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 7
+    loada pfd_fd
+    trap close A
+    trap read 7 dec_scr 999
+    trap read 7 dec_scr 1
+    branchz pfd_p1000_d0
+    trap read 7 dec_scr 999
+    trap read 7 dec_scr 1
+    branchz pfd_p1000_d1
+    trap read 7 dec_scr 999
+    trap read 7 dec_scr 1
+    branchz pfd_p1000_d2
+    trap read 7 dec_scr 999
+    trap read 7 dec_scr 1
+    branchz pfd_p1000_d3
+    trap read 7 dec_scr 999
+    trap read 7 dec_scr 1
+    branchz pfd_p1000_d4
+    trap read 7 dec_scr 999
+    trap read 7 dec_scr 1
+    branchz pfd_p1000_d5
+    trap read 7 dec_scr 999
+    trap read 7 dec_scr 1
+    branchz pfd_p1000_d6
+    trap read 7 dec_scr 999
+    trap read 7 dec_scr 1
+    branchz pfd_p1000_d7
+    trap read 7 dec_scr 999
+    trap read 7 dec_scr 1
+    branchz pfd_p1000_d8
+    seta 0
+    storea dec_leadz
+    trap write 1 dec_ch_9 1
+    jump pfd_sh1000_9
+pfd_p1000_d0:
+    loada dec_leadz
+    branchz pfd_p1000_d0p
+    jump pfd_sh1000_0
+pfd_p1000_d0p:
+    trap write 1 dec_ch_0 1
+    jump pfd_sh1000_0
+pfd_p1000_d1:
+    seta 0
+    storea dec_leadz
+    trap write 1 dec_ch_1 1
+    jump pfd_sh1000_1
+pfd_p1000_d2:
+    seta 0
+    storea dec_leadz
+    trap write 1 dec_ch_2 1
+    jump pfd_sh1000_2
+pfd_p1000_d3:
+    seta 0
+    storea dec_leadz
+    trap write 1 dec_ch_3 1
+    jump pfd_sh1000_3
+pfd_p1000_d4:
+    seta 0
+    storea dec_leadz
+    trap write 1 dec_ch_4 1
+    jump pfd_sh1000_4
+pfd_p1000_d5:
+    seta 0
+    storea dec_leadz
+    trap write 1 dec_ch_5 1
+    jump pfd_sh1000_5
+pfd_p1000_d6:
+    seta 0
+    storea dec_leadz
+    trap write 1 dec_ch_6 1
+    jump pfd_sh1000_6
+pfd_p1000_d7:
+    seta 0
+    storea dec_leadz
+    trap write 1 dec_ch_7 1
+    jump pfd_sh1000_7
+pfd_p1000_d8:
+    seta 0
+    storea dec_leadz
+    trap write 1 dec_ch_8 1
+    jump pfd_sh1000_8
+pfd_sh1000_0:
+    trap open dec_a_path 0 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 7
+    loada pfd_fd
+    trap close A
+    trap read 7 dec_scr 0
+    trap read 7 dec_scr 8192
+    storea dec_rem
+    trap open dec_b_path 577 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 8
+    loada pfd_fd
+    trap close A
+    loada dec_rem
+    trap write 8 dec_scr A
+    trap close 8
+    trap close 7
+    jump pfd_p100
+pfd_sh1000_1:
+    trap open dec_a_path 0 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 7
+    loada pfd_fd
+    trap close A
+    trap read 7 dec_scr 1000
+    trap read 7 dec_scr 8192
+    storea dec_rem
+    trap open dec_b_path 577 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 8
+    loada pfd_fd
+    trap close A
+    loada dec_rem
+    trap write 8 dec_scr A
+    trap close 8
+    trap close 7
+    jump pfd_p100
+pfd_sh1000_2:
+    trap open dec_a_path 0 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 7
+    loada pfd_fd
+    trap close A
+    trap read 7 dec_scr 2000
+    trap read 7 dec_scr 8192
+    storea dec_rem
+    trap open dec_b_path 577 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 8
+    loada pfd_fd
+    trap close A
+    loada dec_rem
+    trap write 8 dec_scr A
+    trap close 8
+    trap close 7
+    jump pfd_p100
+pfd_sh1000_3:
+    trap open dec_a_path 0 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 7
+    loada pfd_fd
+    trap close A
+    trap read 7 dec_scr 3000
+    trap read 7 dec_scr 8192
+    storea dec_rem
+    trap open dec_b_path 577 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 8
+    loada pfd_fd
+    trap close A
+    loada dec_rem
+    trap write 8 dec_scr A
+    trap close 8
+    trap close 7
+    jump pfd_p100
+pfd_sh1000_4:
+    trap open dec_a_path 0 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 7
+    loada pfd_fd
+    trap close A
+    trap read 7 dec_scr 4000
+    trap read 7 dec_scr 8192
+    storea dec_rem
+    trap open dec_b_path 577 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 8
+    loada pfd_fd
+    trap close A
+    loada dec_rem
+    trap write 8 dec_scr A
+    trap close 8
+    trap close 7
+    jump pfd_p100
+pfd_sh1000_5:
+    trap open dec_a_path 0 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 7
+    loada pfd_fd
+    trap close A
+    trap read 7 dec_scr 5000
+    trap read 7 dec_scr 8192
+    storea dec_rem
+    trap open dec_b_path 577 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 8
+    loada pfd_fd
+    trap close A
+    loada dec_rem
+    trap write 8 dec_scr A
+    trap close 8
+    trap close 7
+    jump pfd_p100
+pfd_sh1000_6:
+    trap open dec_a_path 0 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 7
+    loada pfd_fd
+    trap close A
+    trap read 7 dec_scr 6000
+    trap read 7 dec_scr 8192
+    storea dec_rem
+    trap open dec_b_path 577 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 8
+    loada pfd_fd
+    trap close A
+    loada dec_rem
+    trap write 8 dec_scr A
+    trap close 8
+    trap close 7
+    jump pfd_p100
+pfd_sh1000_7:
+    trap open dec_a_path 0 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 7
+    loada pfd_fd
+    trap close A
+    trap read 7 dec_scr 7000
+    trap read 7 dec_scr 8192
+    storea dec_rem
+    trap open dec_b_path 577 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 8
+    loada pfd_fd
+    trap close A
+    loada dec_rem
+    trap write 8 dec_scr A
+    trap close 8
+    trap close 7
+    jump pfd_p100
+pfd_sh1000_8:
+    trap open dec_a_path 0 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 7
+    loada pfd_fd
+    trap close A
+    trap read 7 dec_scr 8000
+    trap read 7 dec_scr 8192
+    storea dec_rem
+    trap open dec_b_path 577 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 8
+    loada pfd_fd
+    trap close A
+    loada dec_rem
+    trap write 8 dec_scr A
+    trap close 8
+    trap close 7
+    jump pfd_p100
+pfd_sh1000_9:
+    trap open dec_a_path 0 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 7
+    loada pfd_fd
+    trap close A
+    trap read 7 dec_scr 9000
+    trap read 7 dec_scr 8192
+    storea dec_rem
+    trap open dec_b_path 577 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 8
+    loada pfd_fd
+    trap close A
+    loada dec_rem
+    trap write 8 dec_scr A
+    trap close 8
+    trap close 7
+    jump pfd_p100
+
+pfd_p100:
+    trap open dec_b_path 0 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 8
+    loada pfd_fd
+    trap close A
+    trap read 8 dec_scr 99
+    trap read 8 dec_scr 1
+    branchz pfd_p100_d0
+    trap read 8 dec_scr 99
+    trap read 8 dec_scr 1
+    branchz pfd_p100_d1
+    trap read 8 dec_scr 99
+    trap read 8 dec_scr 1
+    branchz pfd_p100_d2
+    trap read 8 dec_scr 99
+    trap read 8 dec_scr 1
+    branchz pfd_p100_d3
+    trap read 8 dec_scr 99
+    trap read 8 dec_scr 1
+    branchz pfd_p100_d4
+    trap read 8 dec_scr 99
+    trap read 8 dec_scr 1
+    branchz pfd_p100_d5
+    trap read 8 dec_scr 99
+    trap read 8 dec_scr 1
+    branchz pfd_p100_d6
+    trap read 8 dec_scr 99
+    trap read 8 dec_scr 1
+    branchz pfd_p100_d7
+    trap read 8 dec_scr 99
+    trap read 8 dec_scr 1
+    branchz pfd_p100_d8
+    seta 0
+    storea dec_leadz
+    trap write 1 dec_ch_9 1
+    jump pfd_sh100_9
+pfd_p100_d0:
+    loada dec_leadz
+    branchz pfd_p100_d0p
+    jump pfd_sh100_0
+pfd_p100_d0p:
+    trap write 1 dec_ch_0 1
+    jump pfd_sh100_0
+pfd_p100_d1:
+    seta 0
+    storea dec_leadz
+    trap write 1 dec_ch_1 1
+    jump pfd_sh100_1
+pfd_p100_d2:
+    seta 0
+    storea dec_leadz
+    trap write 1 dec_ch_2 1
+    jump pfd_sh100_2
+pfd_p100_d3:
+    seta 0
+    storea dec_leadz
+    trap write 1 dec_ch_3 1
+    jump pfd_sh100_3
+pfd_p100_d4:
+    seta 0
+    storea dec_leadz
+    trap write 1 dec_ch_4 1
+    jump pfd_sh100_4
+pfd_p100_d5:
+    seta 0
+    storea dec_leadz
+    trap write 1 dec_ch_5 1
+    jump pfd_sh100_5
+pfd_p100_d6:
+    seta 0
+    storea dec_leadz
+    trap write 1 dec_ch_6 1
+    jump pfd_sh100_6
+pfd_p100_d7:
+    seta 0
+    storea dec_leadz
+    trap write 1 dec_ch_7 1
+    jump pfd_sh100_7
+pfd_p100_d8:
+    seta 0
+    storea dec_leadz
+    trap write 1 dec_ch_8 1
+    jump pfd_sh100_8
+pfd_sh100_0:
+    trap open dec_b_path 0 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 8
+    loada pfd_fd
+    trap close A
+    trap read 8 dec_scr 0
+    trap read 8 dec_scr 8192
+    storea dec_rem
+    trap open dec_a_path 577 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 7
+    loada pfd_fd
+    trap close A
+    loada dec_rem
+    trap write 7 dec_scr A
+    trap close 7
+    trap close 8
+    jump pfd_p10
+pfd_sh100_1:
+    trap open dec_b_path 0 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 8
+    loada pfd_fd
+    trap close A
+    trap read 8 dec_scr 100
+    trap read 8 dec_scr 8192
+    storea dec_rem
+    trap open dec_a_path 577 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 7
+    loada pfd_fd
+    trap close A
+    loada dec_rem
+    trap write 7 dec_scr A
+    trap close 7
+    trap close 8
+    jump pfd_p10
+pfd_sh100_2:
+    trap open dec_b_path 0 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 8
+    loada pfd_fd
+    trap close A
+    trap read 8 dec_scr 200
+    trap read 8 dec_scr 8192
+    storea dec_rem
+    trap open dec_a_path 577 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 7
+    loada pfd_fd
+    trap close A
+    loada dec_rem
+    trap write 7 dec_scr A
+    trap close 7
+    trap close 8
+    jump pfd_p10
+pfd_sh100_3:
+    trap open dec_b_path 0 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 8
+    loada pfd_fd
+    trap close A
+    trap read 8 dec_scr 300
+    trap read 8 dec_scr 8192
+    storea dec_rem
+    trap open dec_a_path 577 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 7
+    loada pfd_fd
+    trap close A
+    loada dec_rem
+    trap write 7 dec_scr A
+    trap close 7
+    trap close 8
+    jump pfd_p10
+pfd_sh100_4:
+    trap open dec_b_path 0 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 8
+    loada pfd_fd
+    trap close A
+    trap read 8 dec_scr 400
+    trap read 8 dec_scr 8192
+    storea dec_rem
+    trap open dec_a_path 577 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 7
+    loada pfd_fd
+    trap close A
+    loada dec_rem
+    trap write 7 dec_scr A
+    trap close 7
+    trap close 8
+    jump pfd_p10
+pfd_sh100_5:
+    trap open dec_b_path 0 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 8
+    loada pfd_fd
+    trap close A
+    trap read 8 dec_scr 500
+    trap read 8 dec_scr 8192
+    storea dec_rem
+    trap open dec_a_path 577 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 7
+    loada pfd_fd
+    trap close A
+    loada dec_rem
+    trap write 7 dec_scr A
+    trap close 7
+    trap close 8
+    jump pfd_p10
+pfd_sh100_6:
+    trap open dec_b_path 0 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 8
+    loada pfd_fd
+    trap close A
+    trap read 8 dec_scr 600
+    trap read 8 dec_scr 8192
+    storea dec_rem
+    trap open dec_a_path 577 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 7
+    loada pfd_fd
+    trap close A
+    loada dec_rem
+    trap write 7 dec_scr A
+    trap close 7
+    trap close 8
+    jump pfd_p10
+pfd_sh100_7:
+    trap open dec_b_path 0 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 8
+    loada pfd_fd
+    trap close A
+    trap read 8 dec_scr 700
+    trap read 8 dec_scr 8192
+    storea dec_rem
+    trap open dec_a_path 577 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 7
+    loada pfd_fd
+    trap close A
+    loada dec_rem
+    trap write 7 dec_scr A
+    trap close 7
+    trap close 8
+    jump pfd_p10
+pfd_sh100_8:
+    trap open dec_b_path 0 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 8
+    loada pfd_fd
+    trap close A
+    trap read 8 dec_scr 800
+    trap read 8 dec_scr 8192
+    storea dec_rem
+    trap open dec_a_path 577 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 7
+    loada pfd_fd
+    trap close A
+    loada dec_rem
+    trap write 7 dec_scr A
+    trap close 7
+    trap close 8
+    jump pfd_p10
+pfd_sh100_9:
+    trap open dec_b_path 0 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 8
+    loada pfd_fd
+    trap close A
+    trap read 8 dec_scr 900
+    trap read 8 dec_scr 8192
+    storea dec_rem
+    trap open dec_a_path 577 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 7
+    loada pfd_fd
+    trap close A
+    loada dec_rem
+    trap write 7 dec_scr A
+    trap close 7
+    trap close 8
+    jump pfd_p10
+
+pfd_p10:
+    trap open dec_a_path 0 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 7
+    loada pfd_fd
+    trap close A
+    trap read 7 dec_scr 9
+    trap read 7 dec_scr 1
+    branchz pfd_p10_d0
+    trap read 7 dec_scr 9
+    trap read 7 dec_scr 1
+    branchz pfd_p10_d1
+    trap read 7 dec_scr 9
+    trap read 7 dec_scr 1
+    branchz pfd_p10_d2
+    trap read 7 dec_scr 9
+    trap read 7 dec_scr 1
+    branchz pfd_p10_d3
+    trap read 7 dec_scr 9
+    trap read 7 dec_scr 1
+    branchz pfd_p10_d4
+    trap read 7 dec_scr 9
+    trap read 7 dec_scr 1
+    branchz pfd_p10_d5
+    trap read 7 dec_scr 9
+    trap read 7 dec_scr 1
+    branchz pfd_p10_d6
+    trap read 7 dec_scr 9
+    trap read 7 dec_scr 1
+    branchz pfd_p10_d7
+    trap read 7 dec_scr 9
+    trap read 7 dec_scr 1
+    branchz pfd_p10_d8
+    seta 0
+    storea dec_leadz
+    trap write 1 dec_ch_9 1
+    jump pfd_sh10_9
+pfd_p10_d0:
+    loada dec_leadz
+    branchz pfd_p10_d0p
+    jump pfd_sh10_0
+pfd_p10_d0p:
+    trap write 1 dec_ch_0 1
+    jump pfd_sh10_0
+pfd_p10_d1:
+    seta 0
+    storea dec_leadz
+    trap write 1 dec_ch_1 1
+    jump pfd_sh10_1
+pfd_p10_d2:
+    seta 0
+    storea dec_leadz
+    trap write 1 dec_ch_2 1
+    jump pfd_sh10_2
+pfd_p10_d3:
+    seta 0
+    storea dec_leadz
+    trap write 1 dec_ch_3 1
+    jump pfd_sh10_3
+pfd_p10_d4:
+    seta 0
+    storea dec_leadz
+    trap write 1 dec_ch_4 1
+    jump pfd_sh10_4
+pfd_p10_d5:
+    seta 0
+    storea dec_leadz
+    trap write 1 dec_ch_5 1
+    jump pfd_sh10_5
+pfd_p10_d6:
+    seta 0
+    storea dec_leadz
+    trap write 1 dec_ch_6 1
+    jump pfd_sh10_6
+pfd_p10_d7:
+    seta 0
+    storea dec_leadz
+    trap write 1 dec_ch_7 1
+    jump pfd_sh10_7
+pfd_p10_d8:
+    seta 0
+    storea dec_leadz
+    trap write 1 dec_ch_8 1
+    jump pfd_sh10_8
+pfd_sh10_0:
+    trap open dec_a_path 0 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 7
+    loada pfd_fd
+    trap close A
+    trap read 7 dec_scr 0
+    trap read 7 dec_scr 8192
+    storea dec_rem
+    trap open dec_b_path 577 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 8
+    loada pfd_fd
+    trap close A
+    loada dec_rem
+    trap write 8 dec_scr A
+    trap close 8
+    trap close 7
+    jump pfd_p1
+pfd_sh10_1:
+    trap open dec_a_path 0 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 7
+    loada pfd_fd
+    trap close A
+    trap read 7 dec_scr 10
+    trap read 7 dec_scr 8192
+    storea dec_rem
+    trap open dec_b_path 577 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 8
+    loada pfd_fd
+    trap close A
+    loada dec_rem
+    trap write 8 dec_scr A
+    trap close 8
+    trap close 7
+    jump pfd_p1
+pfd_sh10_2:
+    trap open dec_a_path 0 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 7
+    loada pfd_fd
+    trap close A
+    trap read 7 dec_scr 20
+    trap read 7 dec_scr 8192
+    storea dec_rem
+    trap open dec_b_path 577 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 8
+    loada pfd_fd
+    trap close A
+    loada dec_rem
+    trap write 8 dec_scr A
+    trap close 8
+    trap close 7
+    jump pfd_p1
+pfd_sh10_3:
+    trap open dec_a_path 0 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 7
+    loada pfd_fd
+    trap close A
+    trap read 7 dec_scr 30
+    trap read 7 dec_scr 8192
+    storea dec_rem
+    trap open dec_b_path 577 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 8
+    loada pfd_fd
+    trap close A
+    loada dec_rem
+    trap write 8 dec_scr A
+    trap close 8
+    trap close 7
+    jump pfd_p1
+pfd_sh10_4:
+    trap open dec_a_path 0 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 7
+    loada pfd_fd
+    trap close A
+    trap read 7 dec_scr 40
+    trap read 7 dec_scr 8192
+    storea dec_rem
+    trap open dec_b_path 577 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 8
+    loada pfd_fd
+    trap close A
+    loada dec_rem
+    trap write 8 dec_scr A
+    trap close 8
+    trap close 7
+    jump pfd_p1
+pfd_sh10_5:
+    trap open dec_a_path 0 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 7
+    loada pfd_fd
+    trap close A
+    trap read 7 dec_scr 50
+    trap read 7 dec_scr 8192
+    storea dec_rem
+    trap open dec_b_path 577 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 8
+    loada pfd_fd
+    trap close A
+    loada dec_rem
+    trap write 8 dec_scr A
+    trap close 8
+    trap close 7
+    jump pfd_p1
+pfd_sh10_6:
+    trap open dec_a_path 0 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 7
+    loada pfd_fd
+    trap close A
+    trap read 7 dec_scr 60
+    trap read 7 dec_scr 8192
+    storea dec_rem
+    trap open dec_b_path 577 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 8
+    loada pfd_fd
+    trap close A
+    loada dec_rem
+    trap write 8 dec_scr A
+    trap close 8
+    trap close 7
+    jump pfd_p1
+pfd_sh10_7:
+    trap open dec_a_path 0 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 7
+    loada pfd_fd
+    trap close A
+    trap read 7 dec_scr 70
+    trap read 7 dec_scr 8192
+    storea dec_rem
+    trap open dec_b_path 577 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 8
+    loada pfd_fd
+    trap close A
+    loada dec_rem
+    trap write 8 dec_scr A
+    trap close 8
+    trap close 7
+    jump pfd_p1
+pfd_sh10_8:
+    trap open dec_a_path 0 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 7
+    loada pfd_fd
+    trap close A
+    trap read 7 dec_scr 80
+    trap read 7 dec_scr 8192
+    storea dec_rem
+    trap open dec_b_path 577 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 8
+    loada pfd_fd
+    trap close A
+    loada dec_rem
+    trap write 8 dec_scr A
+    trap close 8
+    trap close 7
+    jump pfd_p1
+pfd_sh10_9:
+    trap open dec_a_path 0 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 7
+    loada pfd_fd
+    trap close A
+    trap read 7 dec_scr 90
+    trap read 7 dec_scr 8192
+    storea dec_rem
+    trap open dec_b_path 577 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 8
+    loada pfd_fd
+    trap close A
+    loada dec_rem
+    trap write 8 dec_scr A
+    trap close 8
+    trap close 7
+    jump pfd_p1
+
+pfd_p1:
+    trap open dec_b_path 0 448
+    brancherr pfd_fail
+    storea pfd_fd
+    trap dup2 A 8
+    loada pfd_fd
+    trap close A
+    trap read 8 dec_scr 0
+    trap read 8 dec_scr 1
+    branchz pfd_p1_d0
+    trap read 8 dec_scr 0
+    trap read 8 dec_scr 1
+    branchz pfd_p1_d1
+    trap read 8 dec_scr 0
+    trap read 8 dec_scr 1
+    branchz pfd_p1_d2
+    trap read 8 dec_scr 0
+    trap read 8 dec_scr 1
+    branchz pfd_p1_d3
+    trap read 8 dec_scr 0
+    trap read 8 dec_scr 1
+    branchz pfd_p1_d4
+    trap read 8 dec_scr 0
+    trap read 8 dec_scr 1
+    branchz pfd_p1_d5
+    trap read 8 dec_scr 0
+    trap read 8 dec_scr 1
+    branchz pfd_p1_d6
+    trap read 8 dec_scr 0
+    trap read 8 dec_scr 1
+    branchz pfd_p1_d7
+    trap read 8 dec_scr 0
+    trap read 8 dec_scr 1
+    branchz pfd_p1_d8
+    seta 0
+    storea dec_leadz
+    trap write 1 dec_ch_9 1
+    jump pfd_end
+pfd_p1_d0:
+    loada dec_leadz
+    branchz pfd_p1_d0p
+    jump pfd_end
+pfd_p1_d0p:
+    trap write 1 dec_ch_0 1
+    jump pfd_end
+pfd_p1_d1:
+    seta 0
+    storea dec_leadz
+    trap write 1 dec_ch_1 1
+    jump pfd_end
+pfd_p1_d2:
+    seta 0
+    storea dec_leadz
+    trap write 1 dec_ch_2 1
+    jump pfd_end
+pfd_p1_d3:
+    seta 0
+    storea dec_leadz
+    trap write 1 dec_ch_3 1
+    jump pfd_end
+pfd_p1_d4:
+    seta 0
+    storea dec_leadz
+    trap write 1 dec_ch_4 1
+    jump pfd_end
+pfd_p1_d5:
+    seta 0
+    storea dec_leadz
+    trap write 1 dec_ch_5 1
+    jump pfd_end
+pfd_p1_d6:
+    seta 0
+    storea dec_leadz
+    trap write 1 dec_ch_6 1
+    jump pfd_end
+pfd_p1_d7:
+    seta 0
+    storea dec_leadz
+    trap write 1 dec_ch_7 1
+    jump pfd_end
+pfd_p1_d8:
+    seta 0
+    storea dec_leadz
+    trap write 1 dec_ch_8 1
+    jump pfd_end
+
+pfd_end:
+    loada dec_leadz
+    branchz pfd_ret
+    trap write 1 dec_ch_0 1
+pfd_ret:
+    jumpm print_ret
+pfd_fail:
+    jumpm print_ret
+
+dec_ch_0:
+    cstring "0"
+dec_ch_1:
+    cstring "1"
+dec_ch_2:
+    cstring "2"
+dec_ch_3:
+    cstring "3"
+dec_ch_4:
+    cstring "4"
+dec_ch_5:
+    cstring "5"
+dec_ch_6:
+    cstring "6"
+dec_ch_7:
+    cstring "7"
+dec_ch_8:
+    cstring "8"
+dec_ch_9:
+    cstring "9"
+dec_a_path:
+    cstring "/tmp/8cl-dec-a"
+dec_b_path:
+    cstring "/tmp/8cl-dec-b"
+dec_val:
+    word 0
+dec_rem:
+    word 0
+dec_leadz:
+    word 0
+pfd_fd:
+    word 0
+dec_scr:
+    zero 8192

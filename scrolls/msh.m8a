@@ -1,71 +1,229 @@
+; msh: the 8th circle shell, C10 oracle edition.
+;
+; Zero friendly arithmetic. Classic crazy ops cannot live in parser loops
+; because D advances one cell per executed instruction, so its position is
+; unpredictable after variable history; crazyinc-style rituals are confined
+; to planned straight-line runs. Instead, byte classification and builtin
+; equality use the filesystem as an oracle: open(2) on a path containing
+; the byte succeeds exactly when the matching magic file under /.m8
+; exists (tree shipped in the rootfs, see tools/mkoracle.py). A suffix
+; character defeats path collapse for '/', '.', and NUL is pre-checked
+; with branchz. Every successful probe fd is closed.
+;
+; Buffers are C9 chase buffers: pointer chains restored by `rechain`,
+; write cursors advance by chasing, the arg chain self-advances across
+; lines, and exec argv slots are a chain too.
+
 start:
     trap write 1 banner banner_end-banner
 
 msh_loop:
     trap write 1 prompt prompt_end-prompt
-    seta after_read_line
+    seta after_read
     storea read_ret
-    jump read_line
-after_read_line:
+    jump read_parse
+after_read:
     loada read_status
     branchnz read_failed
-    loada line_len
+    loada cmd_started
     branchz msh_loop
 
-    seta after_parse
-    storea parse_ret
-    jump parse_line
-after_parse:
-    loada cmd_len
-    branchz msh_loop
+    ; builtin dispatch: unrolled per-character equality through the
+    ; oracle path /.m8/eq/<pattern>/<name>e
+    loada cmd_name+0
+    branchz help_no
+    storea eq_a
+    loada help_cmd+0
+    storea eq_b
+    trap open eq_path 0 0
+    brancherr help_no
+    trap close A
+    loada cmd_name+1
+    branchz help_no
+    storea eq_a
+    loada help_cmd+1
+    storea eq_b
+    trap open eq_path 0 0
+    brancherr help_no
+    trap close A
+    loada cmd_name+2
+    branchz help_no
+    storea eq_a
+    loada help_cmd+2
+    storea eq_b
+    trap open eq_path 0 0
+    brancherr help_no
+    trap close A
+    loada cmd_name+3
+    branchz help_no
+    storea eq_a
+    loada help_cmd+3
+    storea eq_b
+    trap open eq_path 0 0
+    brancherr help_no
+    trap close A
+    loada cmd_name+4
+    branchz do_help
+    jump help_no
 
-    seta help_cmd
-    storea cmp_ptr
-    seta after_help_cmp
-    storea cmp_ret
-    jump cmd_eq
-after_help_cmp:
-    branchnz do_help
+help_no:
+    loada cmd_name+0
+    branchz exit_no
+    storea eq_a
+    loada exit_cmd+0
+    storea eq_b
+    trap open eq_path 0 0
+    brancherr exit_no
+    trap close A
+    loada cmd_name+1
+    branchz exit_no
+    storea eq_a
+    loada exit_cmd+1
+    storea eq_b
+    trap open eq_path 0 0
+    brancherr exit_no
+    trap close A
+    loada cmd_name+2
+    branchz exit_no
+    storea eq_a
+    loada exit_cmd+2
+    storea eq_b
+    trap open eq_path 0 0
+    brancherr exit_no
+    trap close A
+    loada cmd_name+3
+    branchz exit_no
+    storea eq_a
+    loada exit_cmd+3
+    storea eq_b
+    trap open eq_path 0 0
+    brancherr exit_no
+    trap close A
+    loada cmd_name+4
+    branchz do_exit
+    jump exit_no
 
-    seta exit_cmd
-    storea cmp_ptr
-    seta after_exit_cmp
-    storea cmp_ret
-    jump cmd_eq
-after_exit_cmp:
-    branchnz do_exit
+exit_no:
+    loada cmd_name+0
+    branchz cd_no
+    storea eq_a
+    loada cd_cmd+0
+    storea eq_b
+    trap open eq_path 0 0
+    brancherr cd_no
+    trap close A
+    loada cmd_name+1
+    branchz cd_no
+    storea eq_a
+    loada cd_cmd+1
+    storea eq_b
+    trap open eq_path 0 0
+    brancherr cd_no
+    trap close A
+    loada cmd_name+2
+    branchz do_cd
+    jump cd_no
 
-    seta cd_cmd
-    storea cmp_ptr
-    seta after_cd_cmp
-    storea cmp_ret
-    jump cmd_eq
-after_cd_cmp:
-    branchnz do_cd
+cd_no:
+    loada cmd_name+0
+    branchz mfsls_no
+    storea eq_a
+    loada mfsls_cmd+0
+    storea eq_b
+    trap open eq_path 0 0
+    brancherr mfsls_no
+    trap close A
+    loada cmd_name+1
+    branchz mfsls_no
+    storea eq_a
+    loada mfsls_cmd+1
+    storea eq_b
+    trap open eq_path 0 0
+    brancherr mfsls_no
+    trap close A
+    loada cmd_name+2
+    branchz mfsls_no
+    storea eq_a
+    loada mfsls_cmd+2
+    storea eq_b
+    trap open eq_path 0 0
+    brancherr mfsls_no
+    trap close A
+    loada cmd_name+3
+    branchz mfsls_no
+    storea eq_a
+    loada mfsls_cmd+3
+    storea eq_b
+    trap open eq_path 0 0
+    brancherr mfsls_no
+    trap close A
+    loada cmd_name+4
+    branchz mfsls_no
+    storea eq_a
+    loada mfsls_cmd+4
+    storea eq_b
+    trap open eq_path 0 0
+    brancherr mfsls_no
+    trap close A
+    loada cmd_name+5
+    branchz run_mfsls_alias
+    jump mfsls_no
 
-    seta mfsls_cmd
-    storea cmp_ptr
-    seta after_mfsls_cmp
-    storea cmp_ret
-    jump cmd_eq
-after_mfsls_cmp:
-    branchnz run_mfsls_alias
+mfsls_no:
+    loada cmd_name+0
+    branchz mfscat_no
+    storea eq_a
+    loada mfscat_cmd+0
+    storea eq_b
+    trap open eq_path 0 0
+    brancherr mfscat_no
+    trap close A
+    loada cmd_name+1
+    branchz mfscat_no
+    storea eq_a
+    loada mfscat_cmd+1
+    storea eq_b
+    trap open eq_path 0 0
+    brancherr mfscat_no
+    trap close A
+    loada cmd_name+2
+    branchz mfscat_no
+    storea eq_a
+    loada mfscat_cmd+2
+    storea eq_b
+    trap open eq_path 0 0
+    brancherr mfscat_no
+    trap close A
+    loada cmd_name+3
+    branchz mfscat_no
+    storea eq_a
+    loada mfscat_cmd+3
+    storea eq_b
+    trap open eq_path 0 0
+    brancherr mfscat_no
+    trap close A
+    loada cmd_name+4
+    branchz mfscat_no
+    storea eq_a
+    loada mfscat_cmd+4
+    storea eq_b
+    trap open eq_path 0 0
+    brancherr mfscat_no
+    trap close A
+    loada cmd_name+5
+    branchz mfscat_no
+    storea eq_a
+    loada mfscat_cmd+5
+    storea eq_b
+    trap open eq_path 0 0
+    brancherr mfscat_no
+    trap close A
+    loada cmd_name+6
+    branchz run_mfscat_alias
+    jump mfscat_no
 
-    seta mfscat_cmd
-    storea cmp_ptr
-    seta after_mfscat_cmp
-    storea cmp_ret
-    jump cmd_eq
-after_mfscat_cmp:
-    branchnz run_mfscat_alias
-
-    seta after_build_path
-    storea build_path_ret
-    jump build_cmd_path
-after_build_path:
-    seta cmd_path_buf
-    storea cmd_image_ptr
-    jump run_external
+mfscat_no:
+    jump do_external
 
 do_help:
     trap write 1 help_msg help_msg_end-help_msg
@@ -76,9 +234,9 @@ do_exit:
     trap exit 0
 
 do_cd:
-    loada arg_count
+    loada exec_argv+2
     branchz cd_root
-    trap chdir arg_buf
+    trap chdir A
     brancherr cd_failed
     jump msh_loop
 cd_root:
@@ -93,11 +251,7 @@ run_mfsls_alias:
     seta mfs_ls_image
     storea cmd_image_ptr
     seta 0
-    storea arg_count
-    seta arg_ptrs
-    storea scratch_ptr
-    seta 0
-    storei scratch_ptr
+    storea exec_argv+2
     jump run_external
 
 run_mfscat_alias:
@@ -105,15 +259,54 @@ run_mfscat_alias:
     storea cmd_image_ptr
     jump run_external
 
+; Append ".mb\0" to the path name region, then hand the static
+; "/bin/NAME.mb" string to run_external. Each chase write checks the
+; cursor; an over-long name leaves the path unterminated, open fails,
+; and the line lands in unknown_command instead.
+do_external:
+    loada path_cur
+    branchz do_external_run
+    loadi path_cur
+    storea path_next
+    seta 46
+    storei path_cur
+    loada path_next
+    storea path_cur
+    loada path_cur
+    branchz do_external_run
+    loadi path_cur
+    storea path_next
+    seta 109
+    storei path_cur
+    loada path_next
+    storea path_cur
+    loada path_cur
+    branchz do_external_run
+    loadi path_cur
+    storea path_next
+    seta 98
+    storei path_cur
+    loada path_next
+    storea path_cur
+    loada path_cur
+    branchz do_external_run
+    loadi path_cur
+    storea path_next
+    seta 0
+    storei path_cur
+    loada path_next
+    storea path_cur
+do_external_run:
+    seta cmd_path
+    storea cmd_image_ptr
+    jump run_external
+
 run_external:
     loada cmd_image_ptr
+    storea exec_argv+1
     trap open A 0 0
     brancherr unknown_command
     trap close A
-    seta after_build_exec_argv
-    storea build_argv_ret
-    jump build_exec_argv
-after_build_exec_argv:
     trap fork
     brancherr external_failed
     branchz external_child
@@ -126,10 +319,83 @@ external_child:
     trap write 1 exec_failed_msg exec_failed_msg_end-exec_failed_msg
     trap exit 127
 
+; Print the unknown command name one cell at a time, stopping at the
+; first NUL, so no length arithmetic is needed.
 unknown_command:
     trap write 1 unknown_prefix unknown_prefix_end-unknown_prefix
-    loada cmd_len
-    trap write 1 cmd_buf A
+    loada cmd_name+0
+    branchz uc_done
+    trap write 1 cmd_name+0 1
+    loada cmd_name+1
+    branchz uc_done
+    trap write 1 cmd_name+1 1
+    loada cmd_name+2
+    branchz uc_done
+    trap write 1 cmd_name+2 1
+    loada cmd_name+3
+    branchz uc_done
+    trap write 1 cmd_name+3 1
+    loada cmd_name+4
+    branchz uc_done
+    trap write 1 cmd_name+4 1
+    loada cmd_name+5
+    branchz uc_done
+    trap write 1 cmd_name+5 1
+    loada cmd_name+6
+    branchz uc_done
+    trap write 1 cmd_name+6 1
+    loada cmd_name+7
+    branchz uc_done
+    trap write 1 cmd_name+7 1
+    loada cmd_name+8
+    branchz uc_done
+    trap write 1 cmd_name+8 1
+    loada cmd_name+9
+    branchz uc_done
+    trap write 1 cmd_name+9 1
+    loada cmd_name+10
+    branchz uc_done
+    trap write 1 cmd_name+10 1
+    loada cmd_name+11
+    branchz uc_done
+    trap write 1 cmd_name+11 1
+    loada cmd_name+12
+    branchz uc_done
+    trap write 1 cmd_name+12 1
+    loada cmd_name+13
+    branchz uc_done
+    trap write 1 cmd_name+13 1
+    loada cmd_name+14
+    branchz uc_done
+    trap write 1 cmd_name+14 1
+    loada cmd_name+15
+    branchz uc_done
+    trap write 1 cmd_name+15 1
+    loada cmd_name+16
+    branchz uc_done
+    trap write 1 cmd_name+16 1
+    loada cmd_name+17
+    branchz uc_done
+    trap write 1 cmd_name+17 1
+    loada cmd_name+18
+    branchz uc_done
+    trap write 1 cmd_name+18 1
+    loada cmd_name+19
+    branchz uc_done
+    trap write 1 cmd_name+19 1
+    loada cmd_name+20
+    branchz uc_done
+    trap write 1 cmd_name+20 1
+    loada cmd_name+21
+    branchz uc_done
+    trap write 1 cmd_name+21 1
+    loada cmd_name+22
+    branchz uc_done
+    trap write 1 cmd_name+22 1
+    loada cmd_name+23
+    branchz uc_done
+    trap write 1 cmd_name+23 1
+uc_done:
     trap write 1 newline newline_end-newline
     jump msh_loop
 
@@ -146,276 +412,259 @@ eof:
     trap write 1 eof_msg eof_msg_end-eof_msg
     trap exit 0
 
-read_line:
-    seta 0
-    storea line_len
-    storea read_status
-    seta line_buf
-    storea line_cursor
-read_line_loop:
-    loada line_cursor
-    cmpm line_end
-    branchz read_line_overflow
-    trap read 0 input_byte 1
-    brancherr read_line_fail
-    branchz read_line_eof
-    loada input_byte
-    cmpm lf_char
-    branchz read_line_finish
-    loada input_byte
-    cmpm cr_char
-    branchz read_line_loop
-    loada input_byte
-    storei line_cursor
-    loada line_cursor
-    addi 1
-    storea line_cursor
-    loada line_len
-    addi 1
-    storea line_len
-    jump read_line_loop
-read_line_overflow:
-    trap read 0 input_byte 1
-    brancherr read_line_fail
-    branchz read_line_eof
-    loada input_byte
-    cmpm lf_char
-    branchz read_line_finish
-    jump read_line_overflow
-read_line_eof:
-    loada line_len
-    branchz eof
-    jump read_line_finish
-read_line_fail:
-    seta 1
-    storea read_status
-    jumpm read_ret
-read_line_finish:
-    loada line_cursor
-    storea scratch_ptr
-    seta 0
-    storei scratch_ptr
-    jumpm read_ret
+; ---- fused single-pass reader/parser with oracle classification ----
+; Three read loops double as parser states: between words, inside the
+; command word, inside an argument word. The code location is the state.
+; A byte is classified by probing /.m8/x/<byte>x with open; on success
+; the LF and CR oracles under /.m8/n and /.m8/r distinguish which
+; separator it is, and everything else is a space.
 
-parse_line:
+read_parse:
     seta 0
-    storea cmd_len
-    storea arg_count
-    seta line_buf
-    storea src_ptr
-    seta cmd_buf
-    storea cmd_cursor
+    storea read_status
+    storea cmd_done
+    storea line_active
+    storea cmd_started
+    rechain cmd_name 24
+    seta cmd_name
+    storea cmd_cur
+    rechain path_name 24
+    seta path_name
+    storea path_cur
+    rechain exec_args 8
+    seta exec_args
+    storea xcur
+    loada arg_cur
+    branchnz rp_arg_ready
+    rechain arg_buf 512
     seta arg_buf
-    storea arg_cursor
-    seta arg_ptrs
-    storea argv_ptr_cursor
-    storea scratch_ptr
-    seta 0
-    storei scratch_ptr
-parse_skip_leading:
-    loadi src_ptr
-    branchz parse_done
-    cmpm space_char
-    branchz parse_skip_one
-    jump parse_cmd_loop
-parse_skip_one:
-    loada src_ptr
-    addi 1
-    storea src_ptr
-    jump parse_skip_leading
-parse_cmd_loop:
-    loadi src_ptr
-    branchz parse_cmd_done
-    cmpm space_char
-    branchz parse_cmd_done
-    loada cmd_cursor
-    cmpm cmd_end
-    branchz parse_cmd_done
-    loadi src_ptr
-    storei cmd_cursor
-    loada src_ptr
-    addi 1
-    storea src_ptr
-    loada cmd_cursor
-    addi 1
-    storea cmd_cursor
-    jump parse_cmd_loop
-parse_cmd_done:
-    loada cmd_cursor
-    storea scratch_ptr
-    seta 0
-    storei scratch_ptr
-    loada cmd_cursor
-    subm cmd_buf_word
-    storea cmd_len
-parse_arg_skip:
-    loadi src_ptr
-    branchz parse_done
-    cmpm space_char
-    branchz parse_arg_skip_one
-    loada argv_ptr_cursor
-    cmpm arg_ptrs_end
-    branchz parse_done
-    loada arg_cursor
-    cmpm arg_end
-    branchz parse_done
-    loada argv_ptr_cursor
-    storea scratch_ptr
-    loada arg_cursor
-    storei scratch_ptr
-    jump parse_arg_loop
-parse_arg_skip_one:
-    loada src_ptr
-    addi 1
-    storea src_ptr
-    jump parse_arg_skip
-parse_arg_loop:
-    loada arg_cursor
-    cmpm arg_end
-    branchz parse_arg_done_finish
-    loadi src_ptr
-    branchz parse_arg_done_finish
-    storea tmp_ch
-    cmpm space_char
-    branchz parse_arg_done_more
-    loada tmp_ch
-    storei arg_cursor
-    loada src_ptr
-    addi 1
-    storea src_ptr
-    loada arg_cursor
-    addi 1
-    storea arg_cursor
-    jump parse_arg_loop
-parse_arg_done_more:
-    seta 0
-    storei arg_cursor
-    loada arg_cursor
-    addi 1
-    storea arg_cursor
-    loada argv_ptr_cursor
-    addi 1
-    storea argv_ptr_cursor
-    loada argv_ptr_cursor
-    storea scratch_ptr
-    seta 0
-    storei scratch_ptr
-    loada arg_count
-    addi 1
-    storea arg_count
-    jump parse_arg_skip
-parse_arg_done_finish:
-    seta 0
-    storei arg_cursor
-    loada argv_ptr_cursor
-    addi 1
-    storea argv_ptr_cursor
-    loada argv_ptr_cursor
-    storea scratch_ptr
-    seta 0
-    storei scratch_ptr
-    loada arg_count
-    addi 1
-    storea arg_count
-parse_done:
-    jumpm parse_ret
+    storea arg_cur
+rp_arg_ready:
 
-cmd_eq:
-    seta cmd_buf
-    storea src_ptr
-    loada cmp_ptr
-    storea pat_ptr
-cmd_eq_loop:
-    loadi src_ptr
-    storea tmp_ch
-    loadi pat_ptr
-    cmpm tmp_ch
-    branchz cmd_eq_char_ok
-    seta 0
-    jumpm cmp_ret
-cmd_eq_char_ok:
-    loada tmp_ch
-    branchz str_success
-    loada src_ptr
-    addi 1
-    storea src_ptr
-    loada pat_ptr
-    addi 1
-    storea pat_ptr
-    jump cmd_eq_loop
-
-str_success:
+rp_space:
+    trap read 0 input_byte 1
+    brancherr rp_fail
+    branchz rp_eof
+    loada input_byte
+    branchz rp_space_word
+    loada input_byte
+    storei pbx_ptr
+    trap open sep_path 0 0
+    brancherr rp_space_word
+    trap close A
+    loada input_byte
+    storei pbn_ptr
+    trap open sepn_path 0 0
+    brancherr rp_space_cr
+    trap close A
+    jump rp_finish
+rp_space_cr:
+    loada input_byte
+    storei pbr_ptr
+    trap open sepr_path 0 0
+    brancherr rp_space_sp
+    trap close A
+    jump rp_space
+rp_space_sp:
     seta 1
-    jumpm cmp_ret
+    storea line_active
+    jump rp_space
+rp_space_word:
+    seta 1
+    storea line_active
+    loada cmd_done
+    branchnz rp_arg_start
+    seta 1
+    storea cmd_started
+    jump rp_cmd_write
 
-build_cmd_path:
-    seta cmd_path_buf
-    storea copy_dst
-    seta bin_prefix
-    storea copy_src
-    seta after_copy_bin_prefix
-    storea copy_ret
-    jump copy_bytes
-after_copy_bin_prefix:
-    seta cmd_buf
-    storea copy_src
-    seta after_copy_cmd_name
-    storea copy_ret
-    jump copy_bytes
-after_copy_cmd_name:
-    seta mb_suffix
-    storea copy_src
-    seta after_copy_mb_suffix
-    storea copy_ret
-    jump copy_bytes
-after_copy_mb_suffix:
+rp_cmd:
+    trap read 0 input_byte 1
+    brancherr rp_fail
+    branchz rp_eof
+    loada input_byte
+    branchz rp_cmd_write
+    loada input_byte
+    storei pbx_ptr
+    trap open sep_path 0 0
+    brancherr rp_cmd_write
+    trap close A
+    loada input_byte
+    storei pbn_ptr
+    trap open sepn_path 0 0
+    brancherr rp_cmd_cr
+    trap close A
+    jump rp_finish
+rp_cmd_cr:
+    loada input_byte
+    storei pbr_ptr
+    trap open sepr_path 0 0
+    brancherr rp_cmd_end_space
+    trap close A
+    jump rp_cmd
+rp_cmd_write:
+    loada cmd_cur
+    branchz rp_cmd_full
+    loada path_cur
+    branchz rp_cmd_full
+    loadi cmd_cur
+    storea cmd_next
+    loada input_byte
+    storei cmd_cur
+    loada cmd_next
+    storea cmd_cur
+    loadi path_cur
+    storea path_next
+    loada input_byte
+    storei path_cur
+    loada path_next
+    storea path_cur
+    jump rp_cmd
+rp_cmd_full:
+    seta 1
+    storea cmd_done
+    jump rp_space
+rp_cmd_end_space:
+    seta rp_after_cmd_space
+    storea close_ret
+    jump rp_cmd_end
+rp_after_cmd_space:
+    jump rp_space
+
+rp_arg_start:
+    loada xcur
+    branchz rp_drain
+    loada arg_cur
+    branchz rp_drain
+    loada xcur
+    storea x_slot
+    loadi xcur
+    storea xnext
+    loada arg_cur
+    storei xcur
+    loada xnext
+    storea xcur
+    jump rp_arg_write
+
+rp_arg:
+    trap read 0 input_byte 1
+    brancherr rp_fail
+    branchz rp_eof
+    loada input_byte
+    branchz rp_arg_write
+    loada input_byte
+    storei pbx_ptr
+    trap open sep_path 0 0
+    brancherr rp_arg_write
+    trap close A
+    loada input_byte
+    storei pbn_ptr
+    trap open sepn_path 0 0
+    brancherr rp_arg_cr
+    trap close A
+    jump rp_finish
+rp_arg_cr:
+    loada input_byte
+    storei pbr_ptr
+    trap open sepr_path 0 0
+    brancherr rp_arg_end
+    trap close A
+    jump rp_arg
+rp_arg_write:
+    loada arg_cur
+    branchz rp_arg_drop
+    loadi arg_cur
+    storea arg_next
+    loada input_byte
+    storei arg_cur
+    loada arg_next
+    storea arg_cur
+    jump rp_arg
+rp_arg_end:
+    loada arg_cur
+    branchz rp_arg_drop
+    loadi arg_cur
+    storea arg_next
     seta 0
-    storei copy_dst
-    jumpm build_path_ret
-
-build_exec_argv:
-    seta exec_argv
-    storea scratch_ptr
-    seta m8_path
-    storei scratch_ptr
-    seta exec_argv+1
-    storea scratch_ptr
-    loada cmd_image_ptr
-    storei scratch_ptr
-    seta exec_argv+2
-    storea argv_dst_ptr
-    seta arg_ptrs
-    storea argv_src_ptr
-build_argv_loop:
-    loadi argv_src_ptr
-    branchz build_argv_done
-    storei argv_dst_ptr
-    loada argv_src_ptr
-    addi 1
-    storea argv_src_ptr
-    loada argv_dst_ptr
-    addi 1
-    storea argv_dst_ptr
-    jump build_argv_loop
-build_argv_done:
+    storei arg_cur
+    loada arg_next
+    storea arg_cur
+    jump rp_space
+rp_arg_drop:
     seta 0
-    storei argv_dst_ptr
-    jumpm build_argv_ret
+    storei x_slot
+    jump rp_drain
 
-copy_bytes:
-copy_bytes_loop:
-    loadi copy_src
-    branchz copy_bytes_done
-    storei copy_dst
-    loada copy_src
-    addi 1
-    storea copy_src
-    loada copy_dst
-    addi 1
-    storea copy_dst
-    jump copy_bytes_loop
-copy_bytes_done:
-    jumpm copy_ret
+; The line is finished early (arg overflow or too many args) with bytes
+; still unread. Consume input until LF or EOF so the next prompt starts
+; on a clean line boundary. The LF oracle probes /.m8/n.
+rp_drain:
+    trap read 0 input_byte 1
+    brancherr rp_fail
+    branchz rp_drain_eof
+    loada input_byte
+    branchz rp_drain
+    loada input_byte
+    storei pbn_ptr
+    trap open sepn_path 0 0
+    brancherr rp_drain
+    trap close A
+    jump rp_finish
+rp_drain_eof:
+    jump rp_finish
+
+; Close the command word: NUL-terminate the name chain in place.
+rp_cmd_end:
+    loada cmd_cur
+    branchz rp_cmd_noroom
+    loadi cmd_cur
+    storea cmd_next
+    seta 0
+    storei cmd_cur
+    loada cmd_next
+    storea cmd_cur
+    seta 1
+    storea cmd_done
+    jumpm close_ret
+rp_cmd_noroom:
+    seta 1
+    storea cmd_done
+    jumpm close_ret
+
+; Line end: close an open command word, NUL-guard the open argument,
+; zero the first unfilled exec slot as the argv terminator.
+rp_finish:
+    loada cmd_done
+    branchnz rp_finish_guard
+    seta rp_after_cmd_lf
+    storea close_ret
+    jump rp_cmd_end
+rp_after_cmd_lf:
+rp_finish_guard:
+    loada arg_cur
+    branchz rp_finish_slot
+    loadi arg_cur
+    storea arg_next
+    seta 0
+    storei arg_cur
+    loada arg_next
+    storea arg_cur
+rp_finish_slot:
+    loada xcur
+    branchz rp_ret
+    seta 0
+    storei xcur
+rp_ret:
+    jumpm read_ret
+
+rp_eof:
+    loada line_active
+    branchz eof
+    jump rp_finish
+rp_fail:
+    seta 1
+    storea read_status
+    jumpm read_ret
 
 banner:
     ascii "Welcome to 8th circle Linux! Type 'help' to see msh commands.\n"
@@ -472,13 +721,6 @@ mfsls_cmd_end:
 mfscat_cmd:
     cstring "mfscat"
 mfscat_cmd_end:
-bin_prefix:
-    cstring "/bin/"
-bin_prefix_end:
-mb_suffix:
-    cstring ".mb"
-mb_suffix_end:
-
 root_path:
     cstring "/"
 m8_path:
@@ -489,83 +731,91 @@ mfs_cat_image:
     cstring "/bin/mfs.cat.mb"
 empty_env:
     word 0
+
+; Oracle probe paths. The byte cell sits at a fixed label; a pointer
+; word lets storei drop the input byte straight into the path.
+sep_path:
+    ascii "/.m8/x/"
+sep_bx:
+    zero 1
+    cstring "x"
+sepn_path:
+    ascii "/.m8/n/"
+sep_bn:
+    zero 1
+    cstring "x"
+sepr_path:
+    ascii "/.m8/r/"
+sep_br:
+    zero 1
+    cstring "x"
+eq_path:
+    ascii "/.m8/eq/"
+eq_b:
+    zero 1
+    ascii "/"
+eq_a:
+    zero 1
+    cstring "e"
+pbx_ptr:
+    word sep_bx
+pbn_ptr:
+    word sep_bn
+pbr_ptr:
+    word sep_br
+
+; The external command path is one contiguous string:
+; "/bin/" + name bytes (written during parse) + ".mb" + NUL (appended
+; at external dispatch).
+cmd_path:
+    ascii "/bin/"
+path_name:
+    zero 24
+cmd_name:
+    zero 24
+arg_buf:
+    zero 512
 exec_argv:
-    zero 12
-lf_char:
-    word 10
-cr_char:
-    word 13
-space_char:
-    word 32
-line_end:
-    word line_buf+256
-cmd_end:
-    word cmd_buf+95
-arg_end:
-    word arg_buf+511
-arg_ptrs_end:
-    word arg_ptrs+8
-cmd_buf_word:
-    word cmd_buf
-line_len:
+    word m8_path
     word 0
-cmd_len:
+exec_args:
+    zero 8
+exec_argv_term:
     word 0
-arg_count:
+
+cmd_done:
+    word 0
+line_active:
+    word 0
+cmd_started:
     word 0
 read_ret:
     word 0
 read_status:
     word 0
-parse_ret:
-    word 0
-cmp_ret:
-    word 0
-build_path_ret:
-    word 0
-copy_ret:
-    word 0
-build_argv_ret:
+close_ret:
     word 0
 cmd_image_ptr:
     word 0
 child_status:
     word 0
-cmp_ptr:
-    word 0
-copy_src:
-    word 0
-copy_dst:
-    word 0
-argv_src_ptr:
-    word 0
-argv_dst_ptr:
-    word 0
-src_ptr:
-    word 0
-pat_ptr:
-    word 0
-tmp_ch:
-    word 0
-scratch_ptr:
-    word 0
 input_byte:
     word 0
-line_cursor:
+cmd_cur:
     word 0
-cmd_cursor:
+cmd_next:
     word 0
-arg_cursor:
+path_cur:
     word 0
-argv_ptr_cursor:
+path_next:
     word 0
-line_buf:
-    zero 257
-cmd_buf:
-    zero 96
-arg_buf:
-    zero 512
-arg_ptrs:
-    zero 9
-cmd_path_buf:
-    zero 512
+arg_cur:
+    word 0
+arg_next:
+    word 0
+xcur:
+    word 0
+xnext:
+    word 0
+x_slot:
+    word 0

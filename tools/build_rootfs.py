@@ -13,6 +13,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
+import mkoracle
+
 
 def copy_file(src: Path, dst: Path, mode: int | None = None) -> None:
     dst.parent.mkdir(parents=True, exist_ok=True)
@@ -67,6 +69,10 @@ def main() -> int:
     for d in ["bin", "sbin", "dev", "proc", "sys", "tmp", "etc", "run", "var/log", "mfs"]:
         (root / d).mkdir(parents=True, exist_ok=True)
     (root / "tmp").chmod(0o1777)
+
+    # msh byte classification and builtin equality run on open(2) probes
+    # against this precomputed tree; see tools/mkoracle.py.
+    mkoracle.make_tree(root)
 
     # The kernel executes /init. Our runtime auto-loads /sbin/init.mb if no argv image is passed.
     copy_file(args.runtime, root / "init", 0o755)

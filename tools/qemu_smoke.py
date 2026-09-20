@@ -116,13 +116,13 @@ def main() -> int:
         "root.mfs",
         "etc/issue",
         "8th Circle Linux MFS image",
-        "MFS8 v0 image",
+        "MFS8 v1 image",
         "entries: 1",
-        "image-size: 1099",
+        "image-size: 2635",
         "entry-size: 128",
         "name: etc/issue",
         "size: 75",
-        "offset: 1024",
+        "offset: 2560",
         "[8CL:msh] exiting; PID 1 will reopen the circle.",
     ]
 
