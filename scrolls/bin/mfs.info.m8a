@@ -6,8 +6,7 @@ after_load:
     loada mfs_status
     branchnz failed
     trap write 1 title_msg title_msg_end-title_msg
-    seta mfs_buf
-    addi 12
+    seta mfs_buf+12
     storea u16_ptr
     seta after_entry_count
     storea u16_ret
@@ -21,8 +20,7 @@ after_entry_count:
     jump print_dec
 after_print_entries:
     trap write 1 newline newline_end-newline
-    seta mfs_buf
-    addi 24
+    seta mfs_buf+24
     storea u16_ptr
     seta after_image_size
     storea u16_ret
@@ -36,8 +34,7 @@ after_image_size:
     jump print_dec
 after_print_image_size:
     trap write 1 newline newline_end-newline
-    seta mfs_buf
-    addi 28
+    seta mfs_buf+28
     storea u16_ptr
     seta after_entry_size
     storea u16_ret
@@ -52,8 +49,7 @@ after_entry_size:
 after_print_entry_size:
     trap write 1 newline newline_end-newline
     trap write 1 files_label files_label_end-files_label
-    seta mfs_buf
-    addi 512
+    seta mfs_buf+512
     storea mfs_entry_ptr
     seta 0
     storea mfs_entry_idx
@@ -65,9 +61,6 @@ entry_loop:
     storea mfs_name_ret
     jump mfs_copy_name
 after_name:
-    branchz next_entry
-    trap write 1 mfs_name_buf A
-    trap write 1 newline newline_end-newline
 next_entry:
     loada mfs_entry_ptr
     addi 128
@@ -107,31 +100,21 @@ mfs_load_fail:
 mfs_copy_name:
     loada mfs_entry_ptr
     storea src_ptr
-    seta mfs_name_buf
-    storea dst_ptr
-    seta 0
-    storea idx
-copy_name_loop:
-    loada idx
-    cmpm mfs_name_limit
-    branchz copy_name_done
     loadi src_ptr
-    branchz copy_name_done
-    storei dst_ptr
+    branchz mfs_copy_name_done
+mfs_copy_name_loop:
+    storea name_scratch
+    trap write 1 name_scratch 1
     loada src_ptr
     addi 1
     storea src_ptr
-    loada dst_ptr
-    addi 1
-    storea dst_ptr
-    loada idx
-    addi 1
-    storea idx
-    jump copy_name_loop
-copy_name_done:
-    seta 0
-    storei dst_ptr
-    loada idx
+    loadi src_ptr
+    branchz mfs_copy_name_nl
+    jump mfs_copy_name_loop
+mfs_copy_name_nl:
+    trap write 1 newline newline_end-newline
+    seta 1
+mfs_copy_name_done:
     jumpm mfs_name_ret
 
 read_u16:
@@ -317,8 +300,6 @@ mfs_image_path:
     cstring "/mfs/root.mfs"
 ten:
     word 10
-mfs_name_limit:
-    word 95
 mfs_fd:
     word 0
 mfs_len:
@@ -367,13 +348,9 @@ digit_char:
     word 0
 src_ptr:
     word 0
-dst_ptr:
-    word 0
-idx:
+name_scratch:
     word 0
 scratch_ptr:
     word 0
-mfs_name_buf:
-    zero 96
 mfs_buf:
     zero 8192

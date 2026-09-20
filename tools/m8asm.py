@@ -7,6 +7,11 @@ operations at their addresses. M8 inline frame words are encoded as five
 printable base-94 cells that are also valid source cells. Data directives are
 materialized at program startup by generated M8 code, so strings and numeric
 words still become real VM words before user code runs.
+
+The `crazyinc` directive is a codegen macro: it expands at assemble time into
+a classic-op ritual (planned by tools/m8crazy.py) that rewrites a cell from
+x to x+1 with zero friendly arithmetic. The macro assumes straight-line
+fall-through execution from program start; see docs/m8-spec.md.
 """
 from __future__ import annotations
 
@@ -16,6 +21,8 @@ import re
 import shlex
 from dataclasses import dataclass
 from pathlib import Path
+
+import m8crazy
 
 XLAT1 = (
     "+b(29e*j1VMEKLyC})8&m#~W>qxdRp0wkrUo[D7,XTcA\"lI\\"
@@ -91,6 +98,7 @@ class Item:
     line_no: int
     raw: str
     address: int = 0
+    plan: "m8crazy.EntryPlan | None" = None
 
 
 def strip_comment(line: str) -> str:
@@ -162,10 +170,47 @@ def item_size(kind: str, args: list[str], line_no: int) -> int:
     raise SystemExit(f"line {line_no}: unknown directive/instruction {kind!r}")
 
 
+def item_tick_cost(kind: str, args: list[str], line_no: int) -> int:
+    """Executed-instruction cost when C reaches this item by straight-line fall-through.
+
+    Every real instruction costs one D tick. Data directives cost one tick per
+    filler cell, because C walks over the nop filler glyphs unless a jump skips
+    them. The crazyinc macro cost comes from its plan and is handled by the
+    caller.
+    """
+    if kind in ("trap", "jump", "op") or kind in BRANCH_MODES:
+        return 1
+    if kind in ("storea", "loada") or kind in EXT_OPS:
+        return 1
+    if kind == "ascii":
+        return len(parse_string(args[0]))
+    if kind == "cstring":
+        return len(parse_string(args[0])) + 1
+    if kind == "word":
+        return len(args)
+    if kind == "ptr":
+        return len(args)
+    if kind == "ptrv":
+        return len(args) + 1
+    if kind == "zero":
+        return max(0, int(args[0], 0))
+    if kind in ("crazyinc", "crazyinc-cell"):
+        raise AssertionError("crazyinc tick cost must come from its plan")
+    raise SystemExit(f"line {line_no}: unknown directive/instruction {kind!r}")
+
+
 def parse_source(text: str) -> tuple[list[Item], dict[str, int]]:
-    items: list[Item] = []
-    labels: dict[str, int] = {}
-    pc = 0
+    """Two-phase parse.
+
+    Phase one lexes lines into raw (kind, args) entries plus pending labels.
+    Phase two assigns addresses and D ticks. The split exists because a
+    crazyinc macro's size and layout depend on the materializer length and on
+    how many instructions execute before it, and both are only known after the
+    whole source has been lexed.
+    """
+    raw: list[tuple[str, list[str], int, str, list[str]]] = []
+    pending: list[str] = []
+    seen_labels: set[str] = set()
 
     for line_no, original in enumerate(text.splitlines(), 1):
         line = strip_comment(original)
@@ -176,9 +221,10 @@ def parse_source(text: str) -> tuple[list[Item], dict[str, int]]:
             if not m:
                 break
             label, rest = m.group(1), m.group(2)
-            if label in labels:
+            if label in seen_labels:
                 raise SystemExit(f"line {line_no}: duplicate label {label!r}")
-            labels[label] = pc
+            seen_labels.add(label)
+            pending.append(label)
             line = rest.strip()
             if not line:
                 break
@@ -202,11 +248,68 @@ def parse_source(text: str) -> tuple[list[Item], dict[str, int]]:
         elif op == "lda":
             op = "loada"
 
-        size = item_size(op, args, line_no)
-        item = Item(op, args, line_no, original, pc)
+        raw.append((op, args, line_no, original, pending))
+        pending = []
+
+    init_count = count_initializers(raw)
+    mat_cells = init_count * (2 * (1 + ENC_WORD_CELLS)) + (1 + ENC_WORD_CELLS)
+    mat_ticks = 2 * init_count + 1
+
+    items: list[Item] = []
+    labels: dict[str, int] = {}
+    pc = 0
+    ticks = mat_ticks
+    for kind, args, line_no, original, pend in raw:
+        for label in pend:
+            labels[label] = pc
+        if kind == "crazyinc":
+            if len(args) != 1:
+                raise SystemExit(f"line {line_no}: crazyinc expects one literal value")
+            try:
+                value = int(args[0], 0)
+            except ValueError:
+                raise SystemExit(
+                    f"line {line_no}: crazyinc value must be a literal int; labels are not supported yet"
+                ) from None
+            try:
+                plan = m8crazy.plan_entry(value, d_entry=ticks, cell_base=mat_cells + pc)
+            except m8crazy.EntryBlocked as exc:
+                raise SystemExit(f"line {line_no}: crazyinc {value}: {exc}") from None
+            item = Item(kind, args, line_no, original, pc)
+            item.plan = plan
+            size = plan.cell_count
+            ticks += plan.tick_count
+        elif kind == "crazyinc-cell":
+            if len(args) != 2:
+                raise SystemExit(f"line {line_no}: crazyinc-cell expects ADDR VALUE")
+            try:
+                value = int(args[1], 0)
+            except ValueError:
+                raise SystemExit(
+                    f"line {line_no}: crazyinc-cell VALUE must be a literal int"
+                ) from None
+            # The layout size does not depend on the live-cell address, so plan
+            # against a canary address for sizing; the real address (which may
+            # be a label) is resolved during assembly.
+            try:
+                plan = m8crazy.plan_entry(
+                    value, d_entry=ticks, cell_base=mat_cells + pc, cell_addr=57000
+                )
+            except m8crazy.EntryBlocked as exc:
+                raise SystemExit(f"line {line_no}: crazyinc-cell {args[1]}: {exc}") from None
+            item = Item(kind, args, line_no, original, pc)
+            item.plan = plan
+            size = plan.cell_count
+            ticks += plan.tick_count
+        else:
+            item = Item(kind, args, line_no, original, pc)
+            size = item_size(kind, args, line_no)
+            ticks += item_tick_cost(kind, args, line_no)
         items.append(item)
         pc += size
 
+    for label in pending:
+        labels[label] = pc
     return items, labels
 
 
@@ -299,19 +402,24 @@ def eval_expr(expr: str, labels: dict[str, int]) -> int:
     return rec(node)
 
 
-def count_initializers(items: list[Item]) -> int:
+def count_initializers(entries: list) -> int:
+    """Count startup init pairs. Accepts Items or (kind, args) tuples."""
     n = 0
-    for item in items:
-        if item.kind == "ascii":
-            n += len(parse_string(item.args[0]))
-        elif item.kind == "cstring":
-            n += len(parse_string(item.args[0])) + 1
-        elif item.kind == "word":
-            n += len(item.args)
-        elif item.kind == "ptr":
-            n += len(item.args)
-        elif item.kind == "ptrv":
-            n += len(item.args) + 1
+    for entry in entries:
+        if isinstance(entry, tuple):
+            kind, args = entry[0], entry[1]
+        else:
+            kind, args = entry.kind, entry.args
+        if kind == "ascii":
+            n += len(parse_string(args[0]))
+        elif kind == "cstring":
+            n += len(parse_string(args[0])) + 1
+        elif kind == "word":
+            n += len(args)
+        elif kind == "ptr":
+            n += len(args)
+        elif kind == "ptrv":
+            n += len(args) + 1
     return n
 
 
@@ -406,6 +514,48 @@ def assemble_program(items: list[Item], labels: dict[str, int], base: int) -> tu
             if len(item.args) != 1:
                 raise SystemExit(f"line {item.line_no}: op expects one decoded op char")
             mem.append(encode_op(item.args[0], addr))
+        elif item.kind in ("crazyinc", "crazyinc-cell"):
+            plan = item.plan
+            if plan is None:
+                raise SystemExit(f"line {item.line_no}: {item.kind} plan missing (internal error)")
+            if item.kind == "crazyinc-cell":
+                addr = eval_expr(item.args[0], final_labels) % WORD_MOD
+                try:
+                    plan = m8crazy.plan_entry(
+                        int(item.args[1], 0),
+                        d_entry=plan.d_entry,
+                        cell_base=base + item.address,
+                        cell_addr=addr,
+                    )
+                except m8crazy.EntryBlocked as exc:
+                    raise SystemExit(
+                        f"line {item.line_no}: crazyinc-cell {item.args[0]} {item.args[1]}: {exc}"
+                    ) from None
+                if plan.cell_count != item.plan.cell_count:
+                    raise SystemExit(
+                        f"line {item.line_no}: crazyinc-cell plan size changed after label resolution"
+                    )
+            base_addr = cur_addr(item)
+            offset = 0
+            for op in plan.ops:
+                op_addr = base_addr + offset
+                if op.kind == "seta":
+                    mem.append(encode_op("#", op_addr))
+                    add_frame(op.value)
+                    offset += 6
+                elif op.kind == "storea":
+                    mem.append(encode_op("=", op_addr))
+                    add_frame(op.target)
+                    offset += 6
+                elif op.kind == "loada":
+                    mem.append(encode_op("~", op_addr))
+                    add_frame(op.value)
+                    offset += 6
+                else:
+                    mem.append(encode_op(chr(op.value), op_addr))
+                    offset += 1
+            if offset != plan.cell_count:
+                raise AssertionError((offset, plan.cell_count))
         else:
             raise AssertionError(item)
     return mem, init, final_labels

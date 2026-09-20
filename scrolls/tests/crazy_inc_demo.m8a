@@ -1,0 +1,46 @@
+start:
+    seta 0
+    seta 0
+    seta 0
+    seta 0
+    storea 27
+    seta 80
+    storea 28
+    seta 26
+    storea 29
+    seta 0
+    storea 30
+    seta 58017
+    storea 31
+    seta 30527
+    storea 32
+    seta 41
+    storea 33
+    seta 0
+    storea 34
+    seta 0
+    storea 35
+    seta 30527
+    storea 36
+    seta 42
+    storea 37
+    seta 0
+ritual:
+    op p
+    op p
+    op p
+    op p
+    op p
+verify_a:
+    op p
+    op p
+    op <
+verify_cell:
+    loada 31
+    op p
+    op p
+    op <
+finish:
+    seta 10
+    op <
+    op v

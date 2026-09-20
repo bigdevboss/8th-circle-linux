@@ -12,6 +12,8 @@ QEMU_SMOKE = $(TOOLS)/qemu_smoke.py
 DIST_BUILDER = $(TOOLS)/mkdistro.py
 AUDIT = $(TOOLS)/m8audit.py
 LOADER_TESTS = $(TOOLS)/m8_loader_tests.py
+CRAZY = $(TOOLS)/m8crazy.py
+ARITH_AUDIT = $(TOOLS)/m8_arith_audit.py
 
 SCROLLS = scrolls
 RAW = src/userland
@@ -31,12 +33,24 @@ MFS_IMG = $(RAW)/root.mfs
 MB_IMAGES = $(INIT_IMG) $(MSH_IMG) $(BIN_IMAGES)
 RAW_IMAGES = $(MB_IMAGES) $(MFS_IMG)
 
+TESTS = scrolls/tests
+TEST_DEMO_SRC = $(TESTS)/crazy_inc_demo.m8a
+TEST_MACRO_SRC = $(TESTS)/crazy_inc_macro.m8a
+TEST_MID_SRC = $(TESTS)/crazy_inc_mid.m8a
+TEST_CELL_SRC = $(TESTS)/crazy_cell_demo.m8a
+TEST_CHASE_SRC = $(TESTS)/chase_demo.m8a
+TEST_DEMO_IMG = build/tests/crazy_inc_demo.mb
+TEST_MACRO_IMG = build/tests/crazy_inc_macro.mb
+TEST_MID_IMG = build/tests/crazy_inc_mid.mb
+TEST_CELL_IMG = build/tests/crazy_cell_demo.mb
+TEST_CHASE_IMG = build/tests/chase_demo.mb
+
 ROOTFS = build/rootfs
 ROOTFS_STAMP = $(ROOTFS)/.stamp
 INITRAMFS = build/8th-circle-initramfs.cpio.gz
 DIST = build/distro
 
-.PHONY: all raw mfs glyph-audit loader-tests msh-demo init-demo init-trace trace clean distclean check glyphs rootfs initramfs distro qemu qemu-smoke tree
+.PHONY: all raw mfs glyph-audit loader-tests arithmetic-audit arithmetic-audit-details arithmetic-audit-budget crazy-lab crazy-word-lab crazy-planner-lab crazy-route-lab crazy-entry-lab crazy-ritual-test msh-demo init-demo init-trace trace clean distclean check glyphs rootfs initramfs distro qemu qemu-smoke tree
 
 all: $(RUNTIME) raw
 
@@ -49,6 +63,83 @@ glyph-audit: $(MB_IMAGES) $(INIT_DEMO_IMG) $(AUDIT)
 
 loader-tests: $(RUNTIME) $(LOADER_TESTS)
 	python3 $(LOADER_TESTS) $(RUNTIME)
+
+arithmetic-audit: $(ARITH_AUDIT)
+	python3 $(ARITH_AUDIT) $(SCROLLS)
+
+arithmetic-audit-details: $(ARITH_AUDIT)
+	python3 $(ARITH_AUDIT) --details $(SCROLLS)
+
+arithmetic-audit-budget: $(ARITH_AUDIT)
+	python3 $(ARITH_AUDIT) --fail-above 133 $(SCROLLS)
+
+crazy-lab: $(CRAZY)
+	python3 $(CRAZY) table
+	python3 $(CRAZY) word 0 0
+	python3 $(CRAZY) rotate 59048 --steps 3
+	python3 $(CRAZY) search-byte 65 --max-depth 4 --limit 3
+
+crazy-word-lab: $(CRAZY)
+	python3 $(CRAZY) search-word 321 --start 0 --max-depth 4 --limit 1
+	python3 $(CRAZY) search-word 58018 --start 58017 --max-depth 7 --limit 1
+	python3 $(CRAZY) profile --start 58017 --target 58018 --max-depth 7
+
+crazy-planner-lab: $(CRAZY)
+	python3 $(CRAZY) solve-crazy 58017 58018 --limit 3
+	python3 $(CRAZY) runway-word 27 --start-a 0 --max-depth 4 --limit 1
+	python3 $(CRAZY) plan-increment 58017 --max-depth 4 --mask-limit 16
+	python3 $(CRAZY) increment-profile 58017 --count 8 --max-depth 4 --mask-limit 16
+
+crazy-route-lab: $(CRAZY)
+	python3 $(CRAZY) route-window --c-start 1000 --d-start 3000 --steps 5
+	python3 $(CRAZY) route-plan-increment 58017 --max-depth 4 --mask-limit 16 --c-start 1000 --mutable-addr 3004
+	python3 $(CRAZY) route-plan-increment 58019 --max-depth 4 --mask-limit 16 --c-start 1000 --mutable-addr 3004
+
+crazy-entry-lab: $(CRAZY)
+	python3 $(CRAZY) plan-entry 58017
+	python3 $(CRAZY) plan-entry 58017 --emit-scroll
+	python3 $(CRAZY) plan-entry 58019
+	python3 $(CRAZY) plan-entry 58017 --cell-addr 5000
+
+$(TEST_DEMO_IMG): $(TEST_DEMO_SRC) $(ASM) | build
+	mkdir -p build/tests
+	python3 $(ASM) $< -o $@
+
+$(TEST_MACRO_IMG): $(TEST_MACRO_SRC) $(ASM) | build
+	mkdir -p build/tests
+	python3 $(ASM) $< -o $@
+
+$(TEST_MID_IMG): $(TEST_MID_SRC) $(ASM) | build
+	mkdir -p build/tests
+	python3 $(ASM) $< -o $@
+
+$(TEST_CELL_IMG): $(TEST_CELL_SRC) $(ASM) | build
+	mkdir -p build/tests
+	python3 $(ASM) $< -o $@
+
+$(TEST_CHASE_IMG): $(TEST_CHASE_SRC) $(ASM) | build
+	mkdir -p build/tests
+	python3 $(ASM) $< -o $@
+
+chase-test: $(RUNTIME) $(TEST_CHASE_IMG) $(AUDIT)
+	python3 $(AUDIT) $(TEST_CHASE_IMG)
+	@out=`$(RUNTIME) $(TEST_CHASE_IMG)` || exit 1; \
+	if [ "$$out" != "OK!" ]; then \
+		echo "chase demo output mismatch: $$out"; exit 1; \
+	fi; \
+	echo "chase test passed: $$out"
+
+crazy-ritual-test: $(RUNTIME) $(TEST_DEMO_IMG) $(TEST_MACRO_IMG) $(TEST_MID_IMG) $(TEST_CELL_IMG) $(AUDIT)
+	python3 $(AUDIT) $(TEST_DEMO_IMG) $(TEST_MACRO_IMG) $(TEST_MID_IMG) $(TEST_CELL_IMG)
+	cmp $(TEST_DEMO_IMG) $(TEST_MACRO_IMG)
+	@out1=`$(RUNTIME) $(TEST_DEMO_IMG)` || exit 1; \
+	out2=`$(RUNTIME) $(TEST_MACRO_IMG)` || exit 1; \
+	out3=`$(RUNTIME) $(TEST_MID_IMG)` || exit 1; \
+	out4=`$(RUNTIME) $(TEST_CELL_IMG)` || exit 1; \
+	if [ "$$out1" != "OK" ] || [ "$$out2" != "OK" ] || [ "$$out3" != "8COK" ] || [ "$$out4" != "OK" ]; then \
+		echo "crazy ritual output mismatch: demo=$$out1 macro=$$out2 mid=$$out3 cell=$$out4"; exit 1; \
+	fi; \
+	echo "crazy ritual passed: demo=$$out1 macro=$$out2 mid=$$out3 cell=$$out4"
 
 $(RUNTIME): src/runtime/m8.c | build
 	$(CC) $(CFLAGS) -o $@ $<
@@ -118,7 +209,7 @@ qemu-smoke: initramfs $(QEMU_SMOKE)
 tree:
 	find . -maxdepth 4 -type f | sort
 
-check: raw glyph-audit loader-tests msh-demo init-demo initramfs
+check: raw glyph-audit loader-tests msh-demo init-demo crazy-ritual-test chase-test initramfs
 	@echo "ok"
 
 clean:

@@ -1,29 +1,344 @@
 start:
-    loada M8_ARGC
-    storea argc_value
-    cmpm one
+    loadi argv_slot_1
     branchz usage
-    seta 1
-    storea arg_idx
-cat_arg_loop:
-    loada arg_idx
-    cmpm argc_value
-    branchz done
-    seta after_arg_ptr
-    storea argv_ret
-    jump get_argv_ptr
-after_arg_ptr:
     storea path_ptr
-    seta after_cat_one
+    seta cat_slot_1_after
     storea cat_ret
     jump cat_one
-after_cat_one:
+cat_slot_1_after:
     loada cat_status
     branchnz failed
-    loada arg_idx
-    addi 1
-    storea arg_idx
-    jump cat_arg_loop
+    jump cat_slot_2
+cat_slot_2:
+    loadi argv_slot_2
+    branchz done
+    storea path_ptr
+    seta cat_slot_2_after
+    storea cat_ret
+    jump cat_one
+cat_slot_2_after:
+    loada cat_status
+    branchnz failed
+    jump cat_slot_3
+cat_slot_3:
+    loadi argv_slot_3
+    branchz done
+    storea path_ptr
+    seta cat_slot_3_after
+    storea cat_ret
+    jump cat_one
+cat_slot_3_after:
+    loada cat_status
+    branchnz failed
+    jump cat_slot_4
+cat_slot_4:
+    loadi argv_slot_4
+    branchz done
+    storea path_ptr
+    seta cat_slot_4_after
+    storea cat_ret
+    jump cat_one
+cat_slot_4_after:
+    loada cat_status
+    branchnz failed
+    jump cat_slot_5
+cat_slot_5:
+    loadi argv_slot_5
+    branchz done
+    storea path_ptr
+    seta cat_slot_5_after
+    storea cat_ret
+    jump cat_one
+cat_slot_5_after:
+    loada cat_status
+    branchnz failed
+    jump cat_slot_6
+cat_slot_6:
+    loadi argv_slot_6
+    branchz done
+    storea path_ptr
+    seta cat_slot_6_after
+    storea cat_ret
+    jump cat_one
+cat_slot_6_after:
+    loada cat_status
+    branchnz failed
+    jump cat_slot_7
+cat_slot_7:
+    loadi argv_slot_7
+    branchz done
+    storea path_ptr
+    seta cat_slot_7_after
+    storea cat_ret
+    jump cat_one
+cat_slot_7_after:
+    loada cat_status
+    branchnz failed
+    jump cat_slot_8
+cat_slot_8:
+    loadi argv_slot_8
+    branchz done
+    storea path_ptr
+    seta cat_slot_8_after
+    storea cat_ret
+    jump cat_one
+cat_slot_8_after:
+    loada cat_status
+    branchnz failed
+    jump cat_slot_9
+cat_slot_9:
+    loadi argv_slot_9
+    branchz done
+    storea path_ptr
+    seta cat_slot_9_after
+    storea cat_ret
+    jump cat_one
+cat_slot_9_after:
+    loada cat_status
+    branchnz failed
+    jump cat_slot_10
+cat_slot_10:
+    loadi argv_slot_10
+    branchz done
+    storea path_ptr
+    seta cat_slot_10_after
+    storea cat_ret
+    jump cat_one
+cat_slot_10_after:
+    loada cat_status
+    branchnz failed
+    jump cat_slot_11
+cat_slot_11:
+    loadi argv_slot_11
+    branchz done
+    storea path_ptr
+    seta cat_slot_11_after
+    storea cat_ret
+    jump cat_one
+cat_slot_11_after:
+    loada cat_status
+    branchnz failed
+    jump cat_slot_12
+cat_slot_12:
+    loadi argv_slot_12
+    branchz done
+    storea path_ptr
+    seta cat_slot_12_after
+    storea cat_ret
+    jump cat_one
+cat_slot_12_after:
+    loada cat_status
+    branchnz failed
+    jump cat_slot_13
+cat_slot_13:
+    loadi argv_slot_13
+    branchz done
+    storea path_ptr
+    seta cat_slot_13_after
+    storea cat_ret
+    jump cat_one
+cat_slot_13_after:
+    loada cat_status
+    branchnz failed
+    jump cat_slot_14
+cat_slot_14:
+    loadi argv_slot_14
+    branchz done
+    storea path_ptr
+    seta cat_slot_14_after
+    storea cat_ret
+    jump cat_one
+cat_slot_14_after:
+    loada cat_status
+    branchnz failed
+    jump cat_slot_15
+cat_slot_15:
+    loadi argv_slot_15
+    branchz done
+    storea path_ptr
+    seta cat_slot_15_after
+    storea cat_ret
+    jump cat_one
+cat_slot_15_after:
+    loada cat_status
+    branchnz failed
+    jump cat_slot_16
+cat_slot_16:
+    loadi argv_slot_16
+    branchz done
+    storea path_ptr
+    seta cat_slot_16_after
+    storea cat_ret
+    jump cat_one
+cat_slot_16_after:
+    loada cat_status
+    branchnz failed
+    jump cat_slot_17
+cat_slot_17:
+    loadi argv_slot_17
+    branchz done
+    storea path_ptr
+    seta cat_slot_17_after
+    storea cat_ret
+    jump cat_one
+cat_slot_17_after:
+    loada cat_status
+    branchnz failed
+    jump cat_slot_18
+cat_slot_18:
+    loadi argv_slot_18
+    branchz done
+    storea path_ptr
+    seta cat_slot_18_after
+    storea cat_ret
+    jump cat_one
+cat_slot_18_after:
+    loada cat_status
+    branchnz failed
+    jump cat_slot_19
+cat_slot_19:
+    loadi argv_slot_19
+    branchz done
+    storea path_ptr
+    seta cat_slot_19_after
+    storea cat_ret
+    jump cat_one
+cat_slot_19_after:
+    loada cat_status
+    branchnz failed
+    jump cat_slot_20
+cat_slot_20:
+    loadi argv_slot_20
+    branchz done
+    storea path_ptr
+    seta cat_slot_20_after
+    storea cat_ret
+    jump cat_one
+cat_slot_20_after:
+    loada cat_status
+    branchnz failed
+    jump cat_slot_21
+cat_slot_21:
+    loadi argv_slot_21
+    branchz done
+    storea path_ptr
+    seta cat_slot_21_after
+    storea cat_ret
+    jump cat_one
+cat_slot_21_after:
+    loada cat_status
+    branchnz failed
+    jump cat_slot_22
+cat_slot_22:
+    loadi argv_slot_22
+    branchz done
+    storea path_ptr
+    seta cat_slot_22_after
+    storea cat_ret
+    jump cat_one
+cat_slot_22_after:
+    loada cat_status
+    branchnz failed
+    jump cat_slot_23
+cat_slot_23:
+    loadi argv_slot_23
+    branchz done
+    storea path_ptr
+    seta cat_slot_23_after
+    storea cat_ret
+    jump cat_one
+cat_slot_23_after:
+    loada cat_status
+    branchnz failed
+    jump cat_slot_24
+cat_slot_24:
+    loadi argv_slot_24
+    branchz done
+    storea path_ptr
+    seta cat_slot_24_after
+    storea cat_ret
+    jump cat_one
+cat_slot_24_after:
+    loada cat_status
+    branchnz failed
+    jump cat_slot_25
+cat_slot_25:
+    loadi argv_slot_25
+    branchz done
+    storea path_ptr
+    seta cat_slot_25_after
+    storea cat_ret
+    jump cat_one
+cat_slot_25_after:
+    loada cat_status
+    branchnz failed
+    jump cat_slot_26
+cat_slot_26:
+    loadi argv_slot_26
+    branchz done
+    storea path_ptr
+    seta cat_slot_26_after
+    storea cat_ret
+    jump cat_one
+cat_slot_26_after:
+    loada cat_status
+    branchnz failed
+    jump cat_slot_27
+cat_slot_27:
+    loadi argv_slot_27
+    branchz done
+    storea path_ptr
+    seta cat_slot_27_after
+    storea cat_ret
+    jump cat_one
+cat_slot_27_after:
+    loada cat_status
+    branchnz failed
+    jump cat_slot_28
+cat_slot_28:
+    loadi argv_slot_28
+    branchz done
+    storea path_ptr
+    seta cat_slot_28_after
+    storea cat_ret
+    jump cat_one
+cat_slot_28_after:
+    loada cat_status
+    branchnz failed
+    jump cat_slot_29
+cat_slot_29:
+    loadi argv_slot_29
+    branchz done
+    storea path_ptr
+    seta cat_slot_29_after
+    storea cat_ret
+    jump cat_one
+cat_slot_29_after:
+    loada cat_status
+    branchnz failed
+    jump cat_slot_30
+cat_slot_30:
+    loadi argv_slot_30
+    branchz done
+    storea path_ptr
+    seta cat_slot_30_after
+    storea cat_ret
+    jump cat_one
+cat_slot_30_after:
+    loada cat_status
+    branchnz failed
+    jump cat_slot_31
+cat_slot_31:
+    loadi argv_slot_31
+    branchz done
+    storea path_ptr
+    seta cat_slot_31_after
+    storea cat_ret
+    jump cat_one
+cat_slot_31_after:
+    loada cat_status
+    branchnz failed
+    jump done
 done:
     trap exit 0
 usage:
@@ -32,13 +347,6 @@ usage:
 failed:
     trap write 2 failed_msg failed_msg_end-failed_msg
     trap exit 1
-
-get_argv_ptr:
-    loada M8_ARGV
-    addm arg_idx
-    storea scratch_ptr
-    loadi scratch_ptr
-    jumpm argv_ret
 
 cat_one:
     loada path_ptr
@@ -72,23 +380,75 @@ usage_msg_end:
 failed_msg:
     ascii "cat: failed\n"
 failed_msg_end:
-one:
-    word 1
-argc_value:
-    word 0
-arg_idx:
-    word 0
+argv_slot_1:
+    word M8_ARGVEC+1
+argv_slot_2:
+    word M8_ARGVEC+2
+argv_slot_3:
+    word M8_ARGVEC+3
+argv_slot_4:
+    word M8_ARGVEC+4
+argv_slot_5:
+    word M8_ARGVEC+5
+argv_slot_6:
+    word M8_ARGVEC+6
+argv_slot_7:
+    word M8_ARGVEC+7
+argv_slot_8:
+    word M8_ARGVEC+8
+argv_slot_9:
+    word M8_ARGVEC+9
+argv_slot_10:
+    word M8_ARGVEC+10
+argv_slot_11:
+    word M8_ARGVEC+11
+argv_slot_12:
+    word M8_ARGVEC+12
+argv_slot_13:
+    word M8_ARGVEC+13
+argv_slot_14:
+    word M8_ARGVEC+14
+argv_slot_15:
+    word M8_ARGVEC+15
+argv_slot_16:
+    word M8_ARGVEC+16
+argv_slot_17:
+    word M8_ARGVEC+17
+argv_slot_18:
+    word M8_ARGVEC+18
+argv_slot_19:
+    word M8_ARGVEC+19
+argv_slot_20:
+    word M8_ARGVEC+20
+argv_slot_21:
+    word M8_ARGVEC+21
+argv_slot_22:
+    word M8_ARGVEC+22
+argv_slot_23:
+    word M8_ARGVEC+23
+argv_slot_24:
+    word M8_ARGVEC+24
+argv_slot_25:
+    word M8_ARGVEC+25
+argv_slot_26:
+    word M8_ARGVEC+26
+argv_slot_27:
+    word M8_ARGVEC+27
+argv_slot_28:
+    word M8_ARGVEC+28
+argv_slot_29:
+    word M8_ARGVEC+29
+argv_slot_30:
+    word M8_ARGVEC+30
+argv_slot_31:
+    word M8_ARGVEC+31
 path_ptr:
-    word 0
-argv_ret:
     word 0
 cat_ret:
     word 0
 cat_status:
     word 0
 fd:
-    word 0
-scratch_ptr:
     word 0
 file_buf:
     zero 512

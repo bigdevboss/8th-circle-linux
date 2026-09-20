@@ -1,0 +1,33 @@
+start:
+chase_loop:
+    loada cur
+    storea ch_cell
+    trap write 1 ch_cell 1
+    loadi cur
+    branchz chase_done
+    storea cur
+    jump chase_loop
+chase_done:
+    seta 10
+    storea nl_cell
+    trap write 1 nl_cell 1
+    trap exit 0
+
+cur:
+    word node_o
+ch_cell:
+    word 0
+nl_cell:
+    word 0
+pad_bang:
+    zero 318
+node_bang:
+    word 0
+pad_k:
+    zero 41
+node_k:
+    word node_bang
+pad_o:
+    zero 3
+node_o:
+    word node_k

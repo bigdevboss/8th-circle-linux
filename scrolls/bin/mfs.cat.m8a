@@ -10,13 +10,11 @@ after_arg:
 after_load:
     loada mfs_status
     branchnz failed
-    seta mfs_buf
-    addi 12
+    seta mfs_buf+12
     storea scratch_ptr
     loadi scratch_ptr
     storea mfs_entry_count
-    seta mfs_buf
-    addi 512
+    seta mfs_buf+512
     storea mfs_entry_ptr
     seta 0
     storea mfs_entry_idx
@@ -56,32 +54,23 @@ after_size:
     seta mfs_buf
     addm mfs_file_offset
     storea src_ptr
-    seta out_buf
-    storea dst_ptr
     seta 0
     storea idx
 copy_payload_loop:
     loada idx
     cmpm mfs_file_size
     branchz copy_payload_done
-    loada idx
-    cmpm out_limit
-    branchz copy_payload_done
     loadi src_ptr
-    storei dst_ptr
+    storea out_byte
+    trap write 1 out_byte 1
     loada src_ptr
     addi 1
     storea src_ptr
-    loada dst_ptr
-    addi 1
-    storea dst_ptr
     loada idx
     addi 1
     storea idx
     jump copy_payload_loop
 copy_payload_done:
-    loada idx
-    trap write 1 out_buf A
     trap exit 0
 usage:
     trap write 2 usage_msg usage_msg_end-usage_msg
@@ -91,22 +80,16 @@ failed:
     trap exit 1
 
 copy_arg1:
-    loada M8_ARGC
-    cmpm one
-    branchz arg_missing
-    loada M8_ARGV
-    addi 1
-    storea scratch_ptr
-    loadi scratch_ptr
+    loada M8_ARGVEC+1
     branchz arg_missing
     storea src_ptr
     seta path_buf
     storea dst_ptr
-    seta 0
-    storea idx
+    loadi src_ptr
+    branchz arg_missing
 copy_arg_loop:
-    loada idx
-    cmpm path_limit
+    loada dst_ptr
+    cmpm path_end
     branchz copy_arg_done
     loadi src_ptr
     branchz copy_arg_done
@@ -117,14 +100,11 @@ copy_arg_loop:
     loada dst_ptr
     addi 1
     storea dst_ptr
-    loada idx
-    addi 1
-    storea idx
     jump copy_arg_loop
 copy_arg_done:
     seta 0
     storei dst_ptr
-    loada idx
+    seta 1
     jumpm arg_ret
 arg_missing:
     seta 0
@@ -157,12 +137,7 @@ mfs_name_matches_path:
     storea src_ptr
     seta path_buf
     storea pat_ptr
-    seta 0
-    storea idx
 match_loop:
-    loada idx
-    cmpm mfs_name_limit
-    branchz match_fail
     loadi src_ptr
     storea tmp_ch
     loadi pat_ptr
@@ -180,9 +155,6 @@ match_chars_equal:
     loada pat_ptr
     addi 1
     storea pat_ptr
-    loada idx
-    addi 1
-    storea idx
     jump match_loop
 match_success:
     seta 1
@@ -218,14 +190,8 @@ failed_msg:
 failed_msg_end:
 mfs_image_path:
     cstring "/mfs/root.mfs"
-one:
-    word 1
-path_limit:
-    word 511
-mfs_name_limit:
-    word 95
-out_limit:
-    word 4096
+path_end:
+    word path_buf+511
 arg_ret:
     word 0
 mfs_fd:
@@ -266,11 +232,11 @@ idx:
     word 0
 tmp_ch:
     word 0
+out_byte:
+    word 0
 scratch_ptr:
     word 0
 path_buf:
     zero 512
-out_buf:
-    zero 4096
 mfs_buf:
     zero 8192

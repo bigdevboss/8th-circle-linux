@@ -1,0 +1,8 @@
+start:
+    seta 123
+    trap write 1 banner banner_end-banner
+    crazyinc 58017
+
+banner:
+    ascii "8C"
+banner_end:

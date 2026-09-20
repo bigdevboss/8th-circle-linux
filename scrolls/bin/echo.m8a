@@ -1,73 +1,454 @@
 start:
-    loada M8_ARGC
-    storea argc_value
-    cmpm one
-    branchz no_text
-    seta 1
-    storea arg_idx
-arg_loop:
-    loada arg_idx
-    cmpm argc_value
-    branchz done
-    loada arg_idx
-    cmpm one
-    branchz no_space
+    seta 0
+    storea printed_any
+slot_1:
+    loada M8_ARGVEC+1
+    branchz slot_2
+    storea src_ptr
+    loada printed_any
+    branchz nospace_1
     trap write 1 space space_end-space
-no_space:
-    seta after_arg_ptr
-    storea argv_ret
-    jump get_argv_ptr
-after_arg_ptr:
-    storea arg_ptr
-    seta after_copy_arg
+nospace_1:
+    seta 1
+    storea printed_any
+    seta ret_1
     storea copy_ret
-    jump copy_arg
-after_copy_arg:
-    trap write 1 arg_buf A
-    loada arg_idx
-    addi 1
-    storea arg_idx
-    jump arg_loop
-no_text:
+    jump copy_str
+ret_1:
+slot_2:
+    loada M8_ARGVEC+2
+    branchz slot_3
+    storea src_ptr
+    loada printed_any
+    branchz nospace_2
+    trap write 1 space space_end-space
+nospace_2:
+    seta 1
+    storea printed_any
+    seta ret_2
+    storea copy_ret
+    jump copy_str
+ret_2:
+slot_3:
+    loada M8_ARGVEC+3
+    branchz slot_4
+    storea src_ptr
+    loada printed_any
+    branchz nospace_3
+    trap write 1 space space_end-space
+nospace_3:
+    seta 1
+    storea printed_any
+    seta ret_3
+    storea copy_ret
+    jump copy_str
+ret_3:
+slot_4:
+    loada M8_ARGVEC+4
+    branchz slot_5
+    storea src_ptr
+    loada printed_any
+    branchz nospace_4
+    trap write 1 space space_end-space
+nospace_4:
+    seta 1
+    storea printed_any
+    seta ret_4
+    storea copy_ret
+    jump copy_str
+ret_4:
+slot_5:
+    loada M8_ARGVEC+5
+    branchz slot_6
+    storea src_ptr
+    loada printed_any
+    branchz nospace_5
+    trap write 1 space space_end-space
+nospace_5:
+    seta 1
+    storea printed_any
+    seta ret_5
+    storea copy_ret
+    jump copy_str
+ret_5:
+slot_6:
+    loada M8_ARGVEC+6
+    branchz slot_7
+    storea src_ptr
+    loada printed_any
+    branchz nospace_6
+    trap write 1 space space_end-space
+nospace_6:
+    seta 1
+    storea printed_any
+    seta ret_6
+    storea copy_ret
+    jump copy_str
+ret_6:
+slot_7:
+    loada M8_ARGVEC+7
+    branchz slot_8
+    storea src_ptr
+    loada printed_any
+    branchz nospace_7
+    trap write 1 space space_end-space
+nospace_7:
+    seta 1
+    storea printed_any
+    seta ret_7
+    storea copy_ret
+    jump copy_str
+ret_7:
+slot_8:
+    loada M8_ARGVEC+8
+    branchz slot_9
+    storea src_ptr
+    loada printed_any
+    branchz nospace_8
+    trap write 1 space space_end-space
+nospace_8:
+    seta 1
+    storea printed_any
+    seta ret_8
+    storea copy_ret
+    jump copy_str
+ret_8:
+slot_9:
+    loada M8_ARGVEC+9
+    branchz slot_10
+    storea src_ptr
+    loada printed_any
+    branchz nospace_9
+    trap write 1 space space_end-space
+nospace_9:
+    seta 1
+    storea printed_any
+    seta ret_9
+    storea copy_ret
+    jump copy_str
+ret_9:
+slot_10:
+    loada M8_ARGVEC+10
+    branchz slot_11
+    storea src_ptr
+    loada printed_any
+    branchz nospace_10
+    trap write 1 space space_end-space
+nospace_10:
+    seta 1
+    storea printed_any
+    seta ret_10
+    storea copy_ret
+    jump copy_str
+ret_10:
+slot_11:
+    loada M8_ARGVEC+11
+    branchz slot_12
+    storea src_ptr
+    loada printed_any
+    branchz nospace_11
+    trap write 1 space space_end-space
+nospace_11:
+    seta 1
+    storea printed_any
+    seta ret_11
+    storea copy_ret
+    jump copy_str
+ret_11:
+slot_12:
+    loada M8_ARGVEC+12
+    branchz slot_13
+    storea src_ptr
+    loada printed_any
+    branchz nospace_12
+    trap write 1 space space_end-space
+nospace_12:
+    seta 1
+    storea printed_any
+    seta ret_12
+    storea copy_ret
+    jump copy_str
+ret_12:
+slot_13:
+    loada M8_ARGVEC+13
+    branchz slot_14
+    storea src_ptr
+    loada printed_any
+    branchz nospace_13
+    trap write 1 space space_end-space
+nospace_13:
+    seta 1
+    storea printed_any
+    seta ret_13
+    storea copy_ret
+    jump copy_str
+ret_13:
+slot_14:
+    loada M8_ARGVEC+14
+    branchz slot_15
+    storea src_ptr
+    loada printed_any
+    branchz nospace_14
+    trap write 1 space space_end-space
+nospace_14:
+    seta 1
+    storea printed_any
+    seta ret_14
+    storea copy_ret
+    jump copy_str
+ret_14:
+slot_15:
+    loada M8_ARGVEC+15
+    branchz slot_16
+    storea src_ptr
+    loada printed_any
+    branchz nospace_15
+    trap write 1 space space_end-space
+nospace_15:
+    seta 1
+    storea printed_any
+    seta ret_15
+    storea copy_ret
+    jump copy_str
+ret_15:
+slot_16:
+    loada M8_ARGVEC+16
+    branchz slot_17
+    storea src_ptr
+    loada printed_any
+    branchz nospace_16
+    trap write 1 space space_end-space
+nospace_16:
+    seta 1
+    storea printed_any
+    seta ret_16
+    storea copy_ret
+    jump copy_str
+ret_16:
+slot_17:
+    loada M8_ARGVEC+17
+    branchz slot_18
+    storea src_ptr
+    loada printed_any
+    branchz nospace_17
+    trap write 1 space space_end-space
+nospace_17:
+    seta 1
+    storea printed_any
+    seta ret_17
+    storea copy_ret
+    jump copy_str
+ret_17:
+slot_18:
+    loada M8_ARGVEC+18
+    branchz slot_19
+    storea src_ptr
+    loada printed_any
+    branchz nospace_18
+    trap write 1 space space_end-space
+nospace_18:
+    seta 1
+    storea printed_any
+    seta ret_18
+    storea copy_ret
+    jump copy_str
+ret_18:
+slot_19:
+    loada M8_ARGVEC+19
+    branchz slot_20
+    storea src_ptr
+    loada printed_any
+    branchz nospace_19
+    trap write 1 space space_end-space
+nospace_19:
+    seta 1
+    storea printed_any
+    seta ret_19
+    storea copy_ret
+    jump copy_str
+ret_19:
+slot_20:
+    loada M8_ARGVEC+20
+    branchz slot_21
+    storea src_ptr
+    loada printed_any
+    branchz nospace_20
+    trap write 1 space space_end-space
+nospace_20:
+    seta 1
+    storea printed_any
+    seta ret_20
+    storea copy_ret
+    jump copy_str
+ret_20:
+slot_21:
+    loada M8_ARGVEC+21
+    branchz slot_22
+    storea src_ptr
+    loada printed_any
+    branchz nospace_21
+    trap write 1 space space_end-space
+nospace_21:
+    seta 1
+    storea printed_any
+    seta ret_21
+    storea copy_ret
+    jump copy_str
+ret_21:
+slot_22:
+    loada M8_ARGVEC+22
+    branchz slot_23
+    storea src_ptr
+    loada printed_any
+    branchz nospace_22
+    trap write 1 space space_end-space
+nospace_22:
+    seta 1
+    storea printed_any
+    seta ret_22
+    storea copy_ret
+    jump copy_str
+ret_22:
+slot_23:
+    loada M8_ARGVEC+23
+    branchz slot_24
+    storea src_ptr
+    loada printed_any
+    branchz nospace_23
+    trap write 1 space space_end-space
+nospace_23:
+    seta 1
+    storea printed_any
+    seta ret_23
+    storea copy_ret
+    jump copy_str
+ret_23:
+slot_24:
+    loada M8_ARGVEC+24
+    branchz slot_25
+    storea src_ptr
+    loada printed_any
+    branchz nospace_24
+    trap write 1 space space_end-space
+nospace_24:
+    seta 1
+    storea printed_any
+    seta ret_24
+    storea copy_ret
+    jump copy_str
+ret_24:
+slot_25:
+    loada M8_ARGVEC+25
+    branchz slot_26
+    storea src_ptr
+    loada printed_any
+    branchz nospace_25
+    trap write 1 space space_end-space
+nospace_25:
+    seta 1
+    storea printed_any
+    seta ret_25
+    storea copy_ret
+    jump copy_str
+ret_25:
+slot_26:
+    loada M8_ARGVEC+26
+    branchz slot_27
+    storea src_ptr
+    loada printed_any
+    branchz nospace_26
+    trap write 1 space space_end-space
+nospace_26:
+    seta 1
+    storea printed_any
+    seta ret_26
+    storea copy_ret
+    jump copy_str
+ret_26:
+slot_27:
+    loada M8_ARGVEC+27
+    branchz slot_28
+    storea src_ptr
+    loada printed_any
+    branchz nospace_27
+    trap write 1 space space_end-space
+nospace_27:
+    seta 1
+    storea printed_any
+    seta ret_27
+    storea copy_ret
+    jump copy_str
+ret_27:
+slot_28:
+    loada M8_ARGVEC+28
+    branchz slot_29
+    storea src_ptr
+    loada printed_any
+    branchz nospace_28
+    trap write 1 space space_end-space
+nospace_28:
+    seta 1
+    storea printed_any
+    seta ret_28
+    storea copy_ret
+    jump copy_str
+ret_28:
+slot_29:
+    loada M8_ARGVEC+29
+    branchz slot_30
+    storea src_ptr
+    loada printed_any
+    branchz nospace_29
+    trap write 1 space space_end-space
+nospace_29:
+    seta 1
+    storea printed_any
+    seta ret_29
+    storea copy_ret
+    jump copy_str
+ret_29:
+slot_30:
+    loada M8_ARGVEC+30
+    branchz slot_31
+    storea src_ptr
+    loada printed_any
+    branchz nospace_30
+    trap write 1 space space_end-space
+nospace_30:
+    seta 1
+    storea printed_any
+    seta ret_30
+    storea copy_ret
+    jump copy_str
+ret_30:
+slot_31:
+    loada M8_ARGVEC+31
+    branchz done
+    storea src_ptr
+    loada printed_any
+    branchz nospace_31
+    trap write 1 space space_end-space
+nospace_31:
+    seta 1
+    storea printed_any
+    seta ret_31
+    storea copy_ret
+    jump copy_str
+ret_31:
 done:
     trap write 1 newline newline_end-newline
     trap exit 0
 
-get_argv_ptr:
-    loada M8_ARGV
-    addm arg_idx
-    storea scratch_ptr
-    loadi scratch_ptr
-    jumpm argv_ret
-
-copy_arg:
-    loada arg_ptr
-    storea src_ptr
-    seta arg_buf
-    storea dst_ptr
-    seta 0
-    storea idx
-copy_loop:
-    loada idx
-    cmpm arg_limit
-    branchz copy_done
+copy_str:
     loadi src_ptr
     branchz copy_done
-    storei dst_ptr
+    storea byte_scratch
+    trap write 1 byte_scratch 1
     loada src_ptr
     addi 1
     storea src_ptr
-    loada dst_ptr
-    addi 1
-    storea dst_ptr
-    loada idx
-    addi 1
-    storea idx
-    jump copy_loop
+    jump copy_str
 copy_done:
-    seta 0
-    storei dst_ptr
-    loada idx
     jumpm copy_ret
 
 space:
@@ -76,27 +457,11 @@ space_end:
 newline:
     ascii "\n"
 newline_end:
-one:
-    word 1
-arg_limit:
-    word 511
-argc_value:
-    word 0
-arg_idx:
-    word 0
-arg_ptr:
-    word 0
-argv_ret:
+printed_any:
     word 0
 copy_ret:
     word 0
 src_ptr:
     word 0
-dst_ptr:
+byte_scratch:
     word 0
-idx:
-    word 0
-scratch_ptr:
-    word 0
-arg_buf:
-    zero 512

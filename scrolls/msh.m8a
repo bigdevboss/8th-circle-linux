@@ -10,13 +10,6 @@ after_read_line:
     loada read_status
     branchnz read_failed
     loada line_len
-    branchz eof
-
-    seta after_trim
-    storea trim_ret
-    jump trim_line
-after_trim:
-    loada line_len
     branchz msh_loop
 
     seta after_parse
@@ -28,8 +21,6 @@ after_parse:
 
     seta help_cmd
     storea cmp_ptr
-    seta help_cmd_end-help_cmd
-    storea cmp_len
     seta after_help_cmp
     storea cmp_ret
     jump cmd_eq
@@ -38,8 +29,6 @@ after_help_cmp:
 
     seta exit_cmd
     storea cmp_ptr
-    seta exit_cmd_end-exit_cmd
-    storea cmp_len
     seta after_exit_cmp
     storea cmp_ret
     jump cmd_eq
@@ -48,8 +37,6 @@ after_exit_cmp:
 
     seta cd_cmd
     storea cmp_ptr
-    seta cd_cmd_end-cd_cmd
-    storea cmp_len
     seta after_cd_cmp
     storea cmp_ret
     jump cmd_eq
@@ -58,8 +45,6 @@ after_cd_cmp:
 
     seta mfsls_cmd
     storea cmp_ptr
-    seta mfsls_cmd_end-mfsls_cmd
-    storea cmp_len
     seta after_mfsls_cmp
     storea cmp_ret
     jump cmd_eq
@@ -68,8 +53,6 @@ after_mfsls_cmp:
 
     seta mfscat_cmd
     storea cmp_ptr
-    seta mfscat_cmd_end-mfscat_cmd
-    storea cmp_len
     seta after_mfscat_cmp
     storea cmp_ret
     jump cmd_eq
@@ -110,8 +93,11 @@ run_mfsls_alias:
     seta mfs_ls_image
     storea cmd_image_ptr
     seta 0
-    storea arg_len
     storea arg_count
+    seta arg_ptrs
+    storea scratch_ptr
+    seta 0
+    storei scratch_ptr
     jump run_external
 
 run_mfscat_alias:
@@ -164,78 +150,68 @@ read_line:
     seta 0
     storea line_len
     storea read_status
+    seta line_buf
+    storea line_cursor
 read_line_loop:
-    loada line_len
-    cmpm line_max
-    branchz read_line_finish
+    loada line_cursor
+    cmpm line_end
+    branchz read_line_overflow
     trap read 0 input_byte 1
     brancherr read_line_fail
-    branchz read_line_finish
-    seta line_buf
-    addm line_len
-    storea scratch_ptr
-    loada input_byte
-    storei scratch_ptr
-    loada line_len
-    addi 1
-    storea line_len
+    branchz read_line_eof
     loada input_byte
     cmpm lf_char
     branchz read_line_finish
+    loada input_byte
+    cmpm cr_char
+    branchz read_line_loop
+    loada input_byte
+    storei line_cursor
+    loada line_cursor
+    addi 1
+    storea line_cursor
+    loada line_len
+    addi 1
+    storea line_len
     jump read_line_loop
+read_line_overflow:
+    trap read 0 input_byte 1
+    brancherr read_line_fail
+    branchz read_line_eof
+    loada input_byte
+    cmpm lf_char
+    branchz read_line_finish
+    jump read_line_overflow
+read_line_eof:
+    loada line_len
+    branchz eof
+    jump read_line_finish
 read_line_fail:
     seta 1
     storea read_status
     jumpm read_ret
 read_line_finish:
+    loada line_cursor
+    storea scratch_ptr
     seta 0
-    storea read_status
+    storei scratch_ptr
     jumpm read_ret
-
-trim_line:
-    loada line_len
-    branchz trim_zero
-trim_loop:
-    loada line_len
-    branchz trim_zero
-    seta line_buf
-    addm line_len
-    subi 1
-    storea scratch_ptr
-    loadi scratch_ptr
-    cmpm lf_char
-    branchz trim_drop
-    loadi scratch_ptr
-    cmpm cr_char
-    branchz trim_drop
-    jump trim_finish
-trim_drop:
-    loada line_len
-    subi 1
-    storea line_len
-    jump trim_loop
-trim_finish:
-    seta line_buf
-    addm line_len
-    storea scratch_ptr
-    seta 0
-    storei scratch_ptr
-    jumpm trim_ret
-trim_zero:
-    seta line_buf
-    storea scratch_ptr
-    seta 0
-    storei scratch_ptr
-    jumpm trim_ret
 
 parse_line:
     seta 0
     storea cmd_len
-    storea arg_len
     storea arg_count
-    storea arg_used
     seta line_buf
     storea src_ptr
+    seta cmd_buf
+    storea cmd_cursor
+    seta arg_buf
+    storea arg_cursor
+    seta arg_ptrs
+    storea argv_ptr_cursor
+    storea scratch_ptr
+    seta 0
+    storei scratch_ptr
 parse_skip_leading:
     loadi src_ptr
     branchz parse_done
@@ -252,46 +228,40 @@ parse_cmd_loop:
     branchz parse_cmd_done
     cmpm space_char
     branchz parse_cmd_done
-    loada cmd_len
-    cmpm cmd_limit
+    loada cmd_cursor
+    cmpm cmd_end
     branchz parse_cmd_done
-    seta cmd_buf
-    addm cmd_len
-    storea dst_ptr
     loadi src_ptr
-    storei dst_ptr
+    storei cmd_cursor
     loada src_ptr
     addi 1
     storea src_ptr
-    loada cmd_len
+    loada cmd_cursor
     addi 1
-    storea cmd_len
+    storea cmd_cursor
     jump parse_cmd_loop
 parse_cmd_done:
-    seta cmd_buf
-    addm cmd_len
-    storea dst_ptr
+    loada cmd_cursor
+    storea scratch_ptr
     seta 0
-    storei dst_ptr
+    storei scratch_ptr
+    loada cmd_cursor
+    subm cmd_buf_word
+    storea cmd_len
 parse_arg_skip:
     loadi src_ptr
     branchz parse_done
     cmpm space_char
     branchz parse_arg_skip_one
-    loada arg_count
-    cmpm arg_slots
+    loada argv_ptr_cursor
+    cmpm arg_ptrs_end
     branchz parse_done
-    loada arg_used
-    cmpm arg_limit
+    loada arg_cursor
+    cmpm arg_end
     branchz parse_done
-    seta arg_buf
-    addm arg_used
-    storea dst_ptr
-    storea arg_store_ptr
-    seta arg_ptrs
-    addm arg_count
+    loada argv_ptr_cursor
     storea scratch_ptr
-    loada arg_store_ptr
+    loada arg_cursor
     storei scratch_ptr
     jump parse_arg_loop
 parse_arg_skip_one:
@@ -300,8 +270,8 @@ parse_arg_skip_one:
     storea src_ptr
     jump parse_arg_skip
 parse_arg_loop:
-    loada arg_used
-    cmpm arg_limit
+    loada arg_cursor
+    cmpm arg_end
     branchz parse_arg_done_finish
     loadi src_ptr
     branchz parse_arg_done_finish
@@ -309,33 +279,41 @@ parse_arg_loop:
     cmpm space_char
     branchz parse_arg_done_more
     loada tmp_ch
-    storei dst_ptr
+    storei arg_cursor
     loada src_ptr
     addi 1
     storea src_ptr
-    loada dst_ptr
+    loada arg_cursor
     addi 1
-    storea dst_ptr
-    loada arg_used
-    addi 1
-    storea arg_used
-    loada arg_len
-    addi 1
-    storea arg_len
+    storea arg_cursor
     jump parse_arg_loop
 parse_arg_done_more:
     seta 0
-    storei dst_ptr
-    loada arg_used
+    storei arg_cursor
+    loada arg_cursor
     addi 1
-    storea arg_used
+    storea arg_cursor
+    loada argv_ptr_cursor
+    addi 1
+    storea argv_ptr_cursor
+    loada argv_ptr_cursor
+    storea scratch_ptr
+    seta 0
+    storei scratch_ptr
     loada arg_count
     addi 1
     storea arg_count
     jump parse_arg_skip
 parse_arg_done_finish:
     seta 0
-    storei dst_ptr
+    storei arg_cursor
+    loada argv_ptr_cursor
+    addi 1
+    storea argv_ptr_cursor
+    loada argv_ptr_cursor
+    storea scratch_ptr
+    seta 0
+    storei scratch_ptr
     loada arg_count
     addi 1
     storea arg_count
@@ -343,22 +321,11 @@ parse_done:
     jumpm parse_ret
 
 cmd_eq:
-    loada cmd_len
-    cmpm cmp_len
-    branchz cmd_eq_len_ok
-    seta 0
-    jumpm cmp_ret
-cmd_eq_len_ok:
     seta cmd_buf
     storea src_ptr
     loada cmp_ptr
     storea pat_ptr
-    seta 0
-    storea idx
 cmd_eq_loop:
-    loada idx
-    cmpm cmp_len
-    branchz str_success
     loadi src_ptr
     storea tmp_ch
     loadi pat_ptr
@@ -367,15 +334,14 @@ cmd_eq_loop:
     seta 0
     jumpm cmp_ret
 cmd_eq_char_ok:
+    loada tmp_ch
+    branchz str_success
     loada src_ptr
     addi 1
     storea src_ptr
     loada pat_ptr
     addi 1
     storea pat_ptr
-    loada idx
-    addi 1
-    storea idx
     jump cmd_eq_loop
 
 str_success:
@@ -387,24 +353,18 @@ build_cmd_path:
     storea copy_dst
     seta bin_prefix
     storea copy_src
-    seta bin_prefix_end-bin_prefix
-    storea copy_len
     seta after_copy_bin_prefix
     storea copy_ret
     jump copy_bytes
 after_copy_bin_prefix:
     seta cmd_buf
     storea copy_src
-    loada cmd_len
-    storea copy_len
     seta after_copy_cmd_name
     storea copy_ret
     jump copy_bytes
 after_copy_cmd_name:
     seta mb_suffix
     storea copy_src
-    seta mb_suffix_end-mb_suffix
-    storea copy_len
     seta after_copy_mb_suffix
     storea copy_ret
     jump copy_bytes
@@ -418,23 +378,17 @@ build_exec_argv:
     storea scratch_ptr
     seta m8_path
     storei scratch_ptr
-    loada scratch_ptr
-    addi 1
+    seta exec_argv+1
     storea scratch_ptr
     loada cmd_image_ptr
     storei scratch_ptr
-    loada scratch_ptr
-    addi 1
+    seta exec_argv+2
     storea argv_dst_ptr
     seta arg_ptrs
     storea argv_src_ptr
-    seta 0
-    storea argv_idx
 build_argv_loop:
-    loada argv_idx
-    cmpm arg_count
-    branchz build_argv_done
     loadi argv_src_ptr
+    branchz build_argv_done
     storei argv_dst_ptr
     loada argv_src_ptr
     addi 1
@@ -442,9 +396,6 @@ build_argv_loop:
     loada argv_dst_ptr
     addi 1
     storea argv_dst_ptr
-    loada argv_idx
-    addi 1
-    storea argv_idx
     jump build_argv_loop
 build_argv_done:
     seta 0
@@ -452,13 +403,9 @@ build_argv_done:
     jumpm build_argv_ret
 
 copy_bytes:
-    seta 0
-    storea idx
 copy_bytes_loop:
-    loada idx
-    cmpm copy_len
-    branchz copy_bytes_done
     loadi copy_src
+    branchz copy_bytes_done
     storei copy_dst
     loada copy_src
     addi 1
@@ -466,9 +413,6 @@ copy_bytes_loop:
     loada copy_dst
     addi 1
     storea copy_dst
-    loada idx
-    addi 1
-    storea idx
     jump copy_bytes_loop
 copy_bytes_done:
     jumpm copy_ret
@@ -514,25 +458,25 @@ newline:
 newline_end:
 
 help_cmd:
-    ascii "help"
+    cstring "help"
 help_cmd_end:
 exit_cmd:
-    ascii "exit"
+    cstring "exit"
 exit_cmd_end:
 cd_cmd:
-    ascii "cd"
+    cstring "cd"
 cd_cmd_end:
 mfsls_cmd:
-    ascii "mfsls"
+    cstring "mfsls"
 mfsls_cmd_end:
 mfscat_cmd:
-    ascii "mfscat"
+    cstring "mfscat"
 mfscat_cmd_end:
 bin_prefix:
-    ascii "/bin/"
+    cstring "/bin/"
 bin_prefix_end:
 mb_suffix:
-    ascii ".mb"
+    cstring ".mb"
 mb_suffix_end:
 
 root_path:
@@ -553,29 +497,25 @@ cr_char:
     word 13
 space_char:
     word 32
-line_max:
-    word 256
-cmd_limit:
-    word 95
-arg_limit:
-    word 511
-arg_slots:
-    word 8
+line_end:
+    word line_buf+256
+cmd_end:
+    word cmd_buf+95
+arg_end:
+    word arg_buf+511
+arg_ptrs_end:
+    word arg_ptrs+8
+cmd_buf_word:
+    word cmd_buf
 line_len:
     word 0
 cmd_len:
     word 0
-arg_len:
-    word 0
 arg_count:
-    word 0
-arg_used:
     word 0
 read_ret:
     word 0
 read_status:
-    word 0
-trim_ret:
     word 0
 parse_ret:
     word 0
@@ -593,15 +533,9 @@ child_status:
     word 0
 cmp_ptr:
     word 0
-cmp_len:
-    word 0
 copy_src:
     word 0
 copy_dst:
-    word 0
-copy_len:
-    word 0
-argv_idx:
     word 0
 argv_src_ptr:
     word 0
@@ -611,17 +545,19 @@ src_ptr:
     word 0
 pat_ptr:
     word 0
-dst_ptr:
-    word 0
-idx:
-    word 0
 tmp_ch:
     word 0
 scratch_ptr:
     word 0
-arg_store_ptr:
-    word 0
 input_byte:
+    word 0
+line_cursor:
+    word 0
+cmd_cursor:
+    word 0
+arg_cursor:
+    word 0
+argv_ptr_cursor:
     word 0
 line_buf:
     zero 257

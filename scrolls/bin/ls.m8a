@@ -1,18 +1,11 @@
 start:
-    loada M8_ARGC
-    storea argc_value
-    cmpm one
+    seta M8_ARGVEC+1
+    storea argv_slot_ptr
+    loadi argv_slot_ptr
     branchz use_dot
-    seta 1
-    storea arg_idx
 ls_arg_loop:
-    loada arg_idx
-    cmpm argc_value
+    loadi argv_slot_ptr
     branchz done
-    seta after_arg_ptr
-    storea argv_ret
-    jump get_argv_ptr
-after_arg_ptr:
     storea ls_path_ptr
     seta after_ls_one
     storea ls_ret
@@ -20,9 +13,9 @@ after_arg_ptr:
 after_ls_one:
     loada ls_status
     branchnz failed
-    loada arg_idx
+    loada argv_slot_ptr
     addi 1
-    storea arg_idx
+    storea argv_slot_ptr
     jump ls_arg_loop
 use_dot:
     seta dot_path
@@ -38,13 +31,6 @@ done:
 failed:
     trap write 2 failed_msg failed_msg_end-failed_msg
     trap exit 1
-
-get_argv_ptr:
-    loada M8_ARGV
-    addm arg_idx
-    storea scratch_ptr
-    loadi scratch_ptr
-    jumpm argv_ret
 
 ls_one:
     loada ls_path_ptr
@@ -201,17 +187,11 @@ failed_msg:
 failed_msg_end:
 dot_path:
     cstring "."
-one:
-    word 1
 dot_char:
     word 46
 dir_name_limit:
     word 255
-argc_value:
-    word 0
-arg_idx:
-    word 0
-argv_ret:
+argv_slot_ptr:
     word 0
 ls_ret:
     word 0

@@ -1,0 +1,7 @@
+start:
+    crazyinc-cell live_cell 58017
+
+live_cell:
+    word 58017
+neighbors:
+    word 0 0 0 0 0 0

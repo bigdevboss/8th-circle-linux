@@ -162,7 +162,7 @@ The shell now has a tiny PATH-like rule: a command named `NAME` launches `/bin/N
 /bin/mfs.stat.mb
 ```
 
-`echo.mb`, `cat.mb`, and `ls.mb` now loop over argv instead of only seeing one tail string. `ls.mb` calls `getdents64` and parses `linux_dirent64` records in M8. MFS commands read `/mfs/root.mfs`, walk the MFS v0 header/table, print metadata, and copy payload bytes in M8.
+`echo.mb`, `cat.mb`, and `ls.mb` now handle multiple argv entries instead of only seeing one tail string. `cat.mb` and `echo.mb` use unrolled argv slot probes, and `cat.mb` has zero friendly arithmetic debt. `echo.mb` prints one byte per `trap write` and keeps a single `addi 1` for the source pointer. `ls.mb` calls `getdents64` and parses `linux_dirent64` records in M8. MFS commands read `/mfs/root.mfs`, walk the MFS v0 header/table, print metadata, and copy payload bytes in M8. The C6 pass replaced fixed-offset pointer arithmetic with label expressions such as `seta mfs_buf+512` and moved MFS name and payload output to byte-per-trap writes.
 
 Friendly aliases remain:
 
@@ -288,6 +288,8 @@ Important files:
 - `tools/m8asm.py` - assembler that emits printable M8 glyph programs.
 - `tools/m8audit.py` - strict `.mb` glyph/source audit.
 - `tools/m8_loader_tests.py` - negative tests for bad `.mb` files.
+- `tools/m8crazy.py` - crazy-op, ternary exploration, and C5 planner helper.
+- `tools/m8_arith_audit.py` - counts friendly arithmetic debt in scrolls.
 - `tools/mkmfs.py` - MFS v0 image builder.
 - `tools/mkinitramfs.py` - pure-Python `newc` initramfs packer.
 - `tools/mkdistro.py` - copies a kernel and initramfs into a local boot bundle.
@@ -298,12 +300,63 @@ Important files:
 - `src/userland/root.mfs` - MFS v0 image shipped as `/mfs/root.mfs`.
 - `docs/m8-spec.md` - current M8 dialect and trap ABI notes.
 
+## Crazy-op groundwork
+
+Classic Malbolge does not have friendly integer arithmetic. Its real data ritual is ternary rotation plus the crazy operation. M8 still has helper ops such as `addi`, `subi`, `addm`, `subm`, and `cmpm` because the shell and MFS tools need to work. C5 starts by measuring that debt instead of ripping it out blindly.
+
+```sh
+make arithmetic-audit
+make arithmetic-audit-details
+make arithmetic-audit-budget
+make crazy-lab
+make crazy-word-lab
+make crazy-planner-lab
+make crazy-route-lab
+make crazy-entry-lab
+make crazy-ritual-test
+```
+
+`arithmetic-audit` counts helper-op usage in `scrolls/`. `arithmetic-audit-details` prints the exact lines. `arithmetic-audit-budget` currently fails above `133`, so C5 through C7 debt reductions do not silently regress. `crazy-lab` prints the crazy table, word transforms, rotations, and a tiny byte-target search. `crazy-word-lab` tries exact 10-trit word targets in the older toy graph.
+
+`crazy-planner-lab` is stricter. It separates generated D-runway steps from direct cell rewrites. The runway model says `p seed=N` computes `crazy(A, N)` from a generated seed cell and `* seed=N` rotates that seed into `A`. The direct rewrite model solves one final `p` on a mutable cell. For example, it proves that cell value `58017` can become `58018` with A mask `27`, then shows a four-step runway to materialize that mask. It also shows why this is not a generic pointer increment yet: values such as `58019 -> 58020` are blocked by the trit table.
+
+`crazy-route-lab` is the C5.5 routing layer. It places the planned runway on straight-line C/D tracks and prints the code cells, data cells, overlap status, A before and after each step, and the required initial memory values. The sample route uses code cells `1000..1004` and data cells `3000..3004`, with the final mutable cell at `3004`. It proves the small value rewrite without pretending we have solved entry jumps, live ABI-cell placement, loops, or self-cipher-safe re-entry.
+
+`crazy-entry-lab` is the C5.6 entry planner. It plans the whole straight-line scroll, not just the ritual segment: D tick accounting from the very first instruction, seed placement into dead cells behind C, junk `seta` padding, the runway, the final `p`, and two proof chains. `plan-entry 58017 --emit-scroll` prints a ready-to-assemble `.m8a` that rewrites `58017` to `58018` and prints `OK`.
+
+`crazy-ritual-test` is the C5.7/C5.8/C6.1 proof. It assembles four test scrolls, audits them, and runs them under the real runtime:
+
+- `scrolls/tests/crazy_inc_demo.m8a` - planner-emitted scroll; rewrites a cell from `58017` to `58018` using only classic `p` ops, then proves the result. One crazy chain prints `O` from the final A, and a `~` load plus a second chain prints `K` from the rewritten cell. Output `OK`.
+- `scrolls/tests/crazy_inc_macro.m8a` - the same ritual from a single `crazyinc 58017` line. The assembler expands the macro at assemble time through the same planner, and the image is byte-identical to the demo scroll.
+- `scrolls/tests/crazy_inc_mid.m8a` - the macro placed after real instructions and data, proving the planner adapts to the surrounding tick and cell context. Output `8COK`.
+- `scrolls/tests/crazy_cell_demo.m8a` - the live-cell variant. `crazyinc-cell live_cell 58017` rewrites a cell declared in the same scroll instead of a planner-placed dead cell. A classic `j` hop reads a stored pointer word and lands D directly on the live cell, the final `p` rewrites it, and the proof chains run from seeds in neighboring caller scratch cells. Output `OK`.
+
+All four scrolls have zero friendly-arithmetic debt: no `addi`, `subi`, `addm`, `subm`, or `cmpm`. The rewrite itself is pure classic `p` work. Extension ops appear only in the seed setup and the verification readout, none of them audited arithmetic.
+
+The first C5 cleanup moved `cat`, `echo`, and `ls` to argv-vector cursors instead of index-plus-compare loops. The next small cleanup made `cat.m8a` zero-debt by unrolling the runtime argv slots instead of stepping a pointer with `addi 1`. Friendly arithmetic debt dropped from `191` to `180` without changing the runtime ABI or the boot path. C5.4 added planner evidence, C5.5 added straight-line C/D route evidence, and C5.6 through C5.8 added the first real executable crazy ritual: planned, assembled, and proven under the runtime, with an assembler macro on top.
+
+C6 lowered the debt from `180` to `150` with three layout idioms: unrolled argv slot probes plus byte-per-trap output in `echo.m8a` (`5` to `1`), label arithmetic such as `seta mfs_buf+512` and direct slot loads `loada M8_ARGVEC+1` in the MFS tools, and byte-per-trap name and payload output. `mfs.ls` went `9` to `4`, `mfs.cat` `27` to `19`, `mfs.info` `33` to `26`, and `mfs.stat` `40` to `34`. The metric is honest about what moved: these wins come from unrolling, layout, and syscall patterns, not from new crazy math. The crazy side of C6 proves the machinery instead: `crazyinc-cell` rewrites a live program cell through a classic `j` hop, under the same runtime and the same audit as the debt work. Merging the two, for example a crazy-driven pointer walk, is later work.
+
+C7 continued with layout work aimed at the shell. `msh.m8a` dropped from `49` to `33` debt lines by replacing index-plus-limit loops with write cursors and static end-pointer words (`line_end`, `cmd_end`, `arg_end`), comparing strings directly against NUL sentinels instead of carrying compare lengths, and walking the exec argument vector through a NUL-terminated `arg_ptrs` table instead of a counted loop. `read_line` now rejects CR and LF at read time, so the old trim routine is gone. `mfs.cat` uses the same cursor pattern for its argument copy (`18` debt). The only remaining arithmetic in `msh` is `addi` stepping, one `subm` for the command length, and `cmpm` bounds; the `addm` and `subi` helpers are gone from the shell. Total debt: `133`.
+
+`scrolls/tests/chase_demo.m8a` is the C7 pointer-chase proof. A chain of cells holds the absolute address of the next cell, so `loadi cur` plus `storea cur` advances the cursor with zero arithmetic, and a stored `0` ends the walk. The payload lives in the addresses themselves: each node sits at an address whose low byte is the character it prints, `591` for `O`, `587` for `K`, `545` for `!`, written out as one byte through `trap write`. `make chase-test` builds, audits, and runs it, expecting `OK!`.
+
 ## Development commands
 
 ```sh
 make raw          # rebuild printable .mb programs and root.mfs
 make glyph-audit  # verify .mb files are printable valid-source glyph streams
 make loader-tests # verify bad .mb formats are rejected by the runtime
+make arithmetic-audit # count add/sub/compare helper usage in scrolls
+make arithmetic-audit-details # show line-level arithmetic helper usage
+make arithmetic-audit-budget # fail if helper debt rises above the C6 budget
+make crazy-lab    # print crazy-op table and a few ternary probes
+make crazy-word-lab # try toy exact-word searches and reachability profiles
+make crazy-planner-lab # run stricter D-runway and direct-p planning probes
+make crazy-route-lab # lay a planned ritual onto straight-line C/D tracks
+make crazy-entry-lab # plan a full straight-line entry scroll for 58017 -> 58018, plus a live-cell plan
+make crazy-ritual-test # build and run real crazy-ritual test scrolls
+make chase-test   # build and run the zero-arithmetic pointer-chase demo
 make mfs          # rebuild only root.mfs
 make msh-demo     # run msh on the host through the runtime
 make init-demo    # run a small host-side init demo
@@ -335,6 +388,7 @@ Still cursed and unfinished:
 - `.mb` userland is printable, source-validated M8 glyph source now, not numeric VM dumps.
 - The runtime no longer accepts old decimal `.mb` memory images in normal mode.
 - Command lookup is PATH-lite: `NAME` maps to `/bin/NAME.mb`, with up to eight parsed arguments and special aliases for `mfsls` and `mfscat`.
+- C5 through C7 ritual and layout work has landed: `make arithmetic-audit` tracks friendly arithmetic helper debt, `make arithmetic-audit-details` shows exact lines, `make arithmetic-audit-budget` guards the current `133` budget, and `make crazy-lab`, `make crazy-word-lab`, `make crazy-planner-lab`, `make crazy-route-lab`, and `make crazy-entry-lab` explore Malbolge-style crazy/rotate transforms. `make crazy-ritual-test` builds and runs the zero-debt crazy ritual scrolls, the `crazyinc` assembler macro, and the `crazyinc-cell` live-cell variant. `make chase-test` runs the zero-arithmetic pointer-chase demo. C6 and C7 lowered userland debt from `180` to `133` through unrolled argv slots, label arithmetic, byte-per-trap output, write cursors, NUL sentinels, and end-pointer compares.
 
 ## License
 

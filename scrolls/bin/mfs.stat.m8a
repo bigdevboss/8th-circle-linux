@@ -11,13 +11,11 @@ after_arg:
 after_load:
     loada mfs_status
     branchnz failed
-    seta mfs_buf
-    addi 12
+    seta mfs_buf+12
     storea scratch_ptr
     loadi scratch_ptr
     storea mfs_entry_count
-    seta mfs_buf
-    addi 512
+    seta mfs_buf+512
     storea mfs_entry_ptr
     seta 0
     storea mfs_entry_idx
@@ -84,13 +82,7 @@ failed:
     trap exit 1
 
 copy_arg1:
-    loada M8_ARGC
-    cmpm one
-    branchz arg_missing
-    loada M8_ARGV
-    addi 1
-    storea scratch_ptr
-    loadi scratch_ptr
+    loada M8_ARGVEC+1
     branchz arg_missing
     storea src_ptr
     seta path_buf
@@ -150,12 +142,7 @@ mfs_name_matches_path:
     storea src_ptr
     seta path_buf
     storea pat_ptr
-    seta 0
-    storea idx
 match_loop:
-    loada idx
-    cmpm mfs_name_limit
-    branchz match_fail
     loadi src_ptr
     storea tmp_ch
     loadi pat_ptr
@@ -173,9 +160,6 @@ match_chars_equal:
     loada pat_ptr
     addi 1
     storea pat_ptr
-    loada idx
-    addi 1
-    storea idx
     jump match_loop
 match_success:
     seta 1
@@ -362,14 +346,10 @@ not_found_msg:
 not_found_msg_end:
 mfs_image_path:
     cstring "/mfs/root.mfs"
-one:
-    word 1
 ten:
     word 10
 path_limit:
     word 511
-mfs_name_limit:
-    word 95
 arg_ret:
     word 0
 path_len:
