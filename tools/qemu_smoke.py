@@ -42,7 +42,7 @@ def terminate(proc: subprocess.Popen[str]) -> None:
 
 
 def main() -> int:
-    root = Path(__file__).resolve().parents[2]
+    root = Path(__file__).resolve().parents[1]
     initramfs = root / "build/8th-circle-initramfs.cpio.gz"
     if not initramfs.exists():
         raise SystemExit(f"missing {initramfs}; run make initramfs first")

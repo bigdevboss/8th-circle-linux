@@ -2,17 +2,18 @@ CC ?= gcc
 CFLAGS ?= -std=c11 -Wall -Wextra -O2
 
 RUNTIME = build/m8
-ASM = src/toolchain/m8asm.py
-GLYPHS = src/toolchain/m8glyphs.py
-ROOTFS_BUILDER = src/toolchain/build_rootfs.py
-INITRAMFS_BUILDER = src/toolchain/mkinitramfs.py
-MFS_BUILDER = src/toolchain/mkmfs.py
-QEMU_SMOKE = src/toolchain/qemu_smoke.py
-DIST_BUILDER = src/toolchain/mkdistro.py
-AUDIT = src/toolchain/m8audit.py
-LOADER_TESTS = src/toolchain/m8_loader_tests.py
+TOOLS = tools
+ASM = $(TOOLS)/m8asm.py
+GLYPHS = $(TOOLS)/m8glyphs.py
+ROOTFS_BUILDER = $(TOOLS)/build_rootfs.py
+INITRAMFS_BUILDER = $(TOOLS)/mkinitramfs.py
+MFS_BUILDER = $(TOOLS)/mkmfs.py
+QEMU_SMOKE = $(TOOLS)/qemu_smoke.py
+DIST_BUILDER = $(TOOLS)/mkdistro.py
+AUDIT = $(TOOLS)/m8audit.py
+LOADER_TESTS = $(TOOLS)/m8_loader_tests.py
 
-SCROLLS = src/scrolls
+SCROLLS = scrolls
 RAW = src/userland
 
 INIT_SRC = $(SCROLLS)/init.m8a

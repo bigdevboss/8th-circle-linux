@@ -286,19 +286,19 @@ envp:
 
 ## Userland image convention
 
-Human-readable source scrolls live in `src/scrolls/`. Generated printable userland lives in `src/userland/`.
+Human-readable source scrolls live in `scrolls/`. Generated printable userland lives in `src/userland/`.
 
 ```text
-src/scrolls/init.m8a      -> src/userland/init.mb      printable M8 glyph program
-src/scrolls/msh.m8a       -> src/userland/msh.mb       printable M8 glyph program
-src/scrolls/bin/*.m8a     -> src/userland/*.mb         printable M8 glyph programs
+scrolls/init.m8a      -> src/userland/init.mb      printable M8 glyph program
+scrolls/msh.m8a       -> src/userland/msh.mb       printable M8 glyph program
+scrolls/bin/*.m8a     -> src/userland/*.mb         printable M8 glyph programs
 src/mfs/root/             -> src/userland/root.mfs     MFS v0 image
 ```
 
 
 ## Format audit
 
-`src/toolchain/m8audit.py` checks the generated `.mb` files without running them. It rejects:
+`tools/m8audit.py` checks the generated `.mb` files without running them. It rejects:
 
 - non-graphic source cells
 - cells that decode to unknown operations at their addresses

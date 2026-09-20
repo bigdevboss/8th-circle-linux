@@ -111,11 +111,11 @@ Welcome to 8th circle Linux! Type 'help' to see msh commands.
 ## What works
 
 - M8 runtime in `src/runtime/m8.c`.
-- M8 assembler in `src/toolchain/m8asm.py`.
+- M8 assembler in `tools/m8asm.py`.
 - Printable, source-validated M8 glyph userland images in `src/userland/`.
-- PID 1 scroll in `src/scrolls/init.m8a`.
-- Shell scroll in `src/scrolls/msh.m8a`.
-- External command scrolls in `src/scrolls/bin/*.m8a`.
+- PID 1 scroll in `scrolls/init.m8a`.
+- Shell scroll in `scrolls/msh.m8a`.
+- External command scrolls in `scrolls/bin/*.m8a`.
 - Pure-Python initramfs builder.
 - QEMU boot through `make qemu`.
 - PTY-driven QEMU smoke test through `make qemu-smoke`.
@@ -203,12 +203,12 @@ One ugly runtime bridge remains on purpose: extension instruction cells keep the
 
 ## Userland image convention
 
-There is no separate `raw/` directory. The generated M8 programs are distro userland and live in `src/userland/`. Human-editable source scrolls live in `src/scrolls/`.
+There is no separate `raw/` directory. The generated M8 programs are distro userland and live in `src/userland/`. Human-editable source scrolls live in `scrolls/`.
 
 ```text
-src/scrolls/init.m8a      -> src/userland/init.mb
-src/scrolls/msh.m8a       -> src/userland/msh.mb
-src/scrolls/bin/*.m8a     -> src/userland/*.mb
+scrolls/init.m8a      -> src/userland/init.mb
+scrolls/msh.m8a       -> src/userland/msh.mb
+scrolls/bin/*.m8a     -> src/userland/*.mb
 src/mfs/root/             -> src/userland/root.mfs
 ```
 
@@ -273,11 +273,11 @@ The filesystem is not sane, and neither are we.
 ```text
 src/
   runtime/      M8 VM/runtime, currently C
-  toolchain/    assembler, MFS builder, initramfs builder, QEMU tooling
-  scrolls/      human-readable .m8a source scrolls
-  scrolls/bin/  external command source scrolls
   userland/     generated printable .mb programs shipped by the distro
   mfs/root/     source tree for the MFS v0 image
+scrolls/        human-readable .m8a source scrolls
+scrolls/bin/    external command source scrolls
+tools/          assembler, MFS builder, initramfs builder, QEMU tooling
 docs/           M8 dialect spec
 build/          generated build artifacts, ignored by git
 ```
@@ -285,13 +285,13 @@ build/          generated build artifacts, ignored by git
 Important files:
 
 - `src/runtime/m8.c` - prototype runtime for M8.
-- `src/toolchain/m8asm.py` - assembler that emits printable M8 glyph programs.
-- `src/toolchain/m8audit.py` - strict `.mb` glyph/source audit.
-- `src/toolchain/m8_loader_tests.py` - negative tests for bad `.mb` files.
-- `src/toolchain/mkmfs.py` - MFS v0 image builder.
-- `src/toolchain/mkinitramfs.py` - pure-Python `newc` initramfs packer.
-- `src/toolchain/mkdistro.py` - copies a kernel and initramfs into a local boot bundle.
-- `src/toolchain/qemu_smoke.py` - serial-console QEMU smoke test.
+- `tools/m8asm.py` - assembler that emits printable M8 glyph programs.
+- `tools/m8audit.py` - strict `.mb` glyph/source audit.
+- `tools/m8_loader_tests.py` - negative tests for bad `.mb` files.
+- `tools/mkmfs.py` - MFS v0 image builder.
+- `tools/mkinitramfs.py` - pure-Python `newc` initramfs packer.
+- `tools/mkdistro.py` - copies a kernel and initramfs into a local boot bundle.
+- `tools/qemu_smoke.py` - serial-console QEMU smoke test.
 - `src/userland/init.mb` - printable M8 init program shipped as `/sbin/init.mb`.
 - `src/userland/msh.mb` - printable M8 shell program shipped as `/bin/msh.mb`.
 - `src/userland/{pwd,issue,echo,cat,ls,mfs.ls,mfs.cat,mfs.info,mfs.stat}.mb` - external command images shipped under `/bin`.
